@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "669701860929",
+    "project_id": "kientrucphanmem-server",
+    "storage_bucket": "kientrucphanmem-server.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:669701860929:android:b0e22847641e5df92460c0",
+        "android_client_info": {
+          "package_name": "com.anonymous.ottmobileapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCozwEo0OtBkIFmXCm3fqtwCWdz_P2rWZg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
