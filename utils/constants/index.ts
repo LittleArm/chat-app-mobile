@@ -1,7 +1,7 @@
 export const STORAGE_KEY = {
   // BASE_URL: 'http://103.237.146.123:8000',
   // CHAT_SOCKET_BASE_URL: 'http://103.237.146.123:8001/',
-  BASE_URL: 'http://192.168.1.57:3008',
+  BASE_URL: 'http://192.168.1.224:5050',
   CHAT_SOCKET_BASE_URL: 'http://192.168.1.57:3002',
   ACCESS_TOKEN: 'access_token',
   REFRESH_TOKEN: 'refresh_token',
