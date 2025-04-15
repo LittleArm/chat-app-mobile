@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Button, TextInput } from "react-native-paper";
-import { StyleSheet, Image, GestureResponderEvent } from "react-native";
-import ParallaxScrollView from "@/components/ParallaxScrollView";
-import { ThemedView } from "@/components/ThemedView";
+import { Link } from "expo-router";
+import { StyleSheet, Text, View, GestureResponderEvent, ScrollView } from "react-native";
 import { RegisterDto } from "@/types/api/dto";
 import { useMutation } from "react-query";
 import { authAPI } from "@/api";
@@ -54,14 +53,6 @@ export default function RegisterScreen() {
     const handleRegister = (event: GestureResponderEvent) => {
         event.preventDefault();
 
-        // Validate password match
-        if (registerInfo.password !== confirmPassword) {
-            setErrorText("Mật khẩu không trùng khớp!");
-            setErrorVisible(true);
-            return;
-        }
-
-        // Validate required fields
         if (!registerInfo.username || !registerInfo.email || !registerInfo.password ||
             !registerInfo.phone || !registerInfo.first_name || !registerInfo.last_name) {
             setErrorText("Vui lòng điền đầy đủ thông tin!");
@@ -69,9 +60,20 @@ export default function RegisterScreen() {
             return;
         }
 
-        // Simple email validation
         if (!/^\S+@\S+\.\S+$/.test(registerInfo.email)) {
             setErrorText("Email không hợp lệ!");
+            setErrorVisible(true);
+            return;
+        }
+
+        if (registerInfo.phone.length < 10) {
+            setErrorText("Số điện thoại không hợp lệ!");
+            setErrorVisible(true);
+            return;
+        }
+
+        if (registerInfo.password.length < 6) {
+            setErrorText("Mật khẩu phải có ít nhất 6 ký tự!");
             setErrorVisible(true);
             return;
         }
@@ -102,113 +104,127 @@ export default function RegisterScreen() {
     };
 
     return (
-        <ParallaxScrollView
-            headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
-            headerImage={
-                <Image
-                    source={require("@/assets/images/partial-react-logo.png")}
-                    style={styles.reactLogo}
-                />
-            }
-        >
-            <ThemedView style={styles.stepContainer}>
-                <TextInput
-                    mode="outlined"
-                    label="Tên đăng nhập"
-                    placeholder="Nhập tên đăng nhập"
-                    value={registerInfo.username}
-                    onChangeText={(value) => onFormChangeHandler("username", value)}
-                    autoCapitalize="none"
-                    autoFocus
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Email"
-                    placeholder="Nhập email"
-                    value={registerInfo.email}
-                    onChangeText={(value) => onFormChangeHandler("email", value)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Họ"
-                    placeholder="Nhập họ"
-                    value={registerInfo.first_name}
-                    onChangeText={(value) => onFormChangeHandler("first_name", value)}
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Tên"
-                    placeholder="Nhập tên"
-                    value={registerInfo.last_name}
-                    onChangeText={(value) => onFormChangeHandler("last_name", value)}
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Số điện thoại"
-                    placeholder="Nhập số điện thoại"
-                    value={registerInfo.phone}
-                    onChangeText={handleChangePhone}
-                    keyboardType="phone-pad"
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Mật khẩu"
-                    placeholder="Nhập mật khẩu"
-                    secureTextEntry={true}
-                    value={registerInfo.password}
-                    onChangeText={(value) => onFormChangeHandler("password", value)}
-                />
-                <TextInput
-                    mode="outlined"
-                    label="Xác nhận mật khẩu"
-                    placeholder="Nhập lại mật khẩu"
-                    secureTextEntry={true}
-                    value={confirmPassword}
-                    onChangeText={checkIdenticalConfirmedPass}
-                />
-                {errorVisible && (
-                    <ThemedText type={errorText.includes("thành công") ? "default" : "error"}>
-                        {errorText}
-                    </ThemedText>
-                )}
-                <Button
-                    style={{ backgroundColor: "#0190f3" }}
-                    mode="contained"
-                    onPress={handleRegister}
-                    loading={register.isLoading}
-                    disabled={register.isLoading}
-                >
-                    Đăng ký
-                </Button>
-                <Button
-                    mode="text"
-                    onPress={() => router.navigate("/login")}
-                    style={{ marginTop: 8 }}
-                >
-                    Đã có tài khoản? Đăng nhập
-                </Button>
-            </ThemedView>
-        </ParallaxScrollView>
+        <View style={styles.container}>
+            <ScrollView
+                contentContainerStyle={styles.scrollContainer}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+            >
+                <Text style={styles.title}>Đăng ký ZChat</Text>
+
+                <View style={styles.formContainer}>
+                    <TextInput
+                        mode="outlined"
+                        label="Tên đăng nhập"
+                        placeholder="Nhập tên đăng nhập"
+                        value={registerInfo.username}
+                        onChangeText={(value) => onFormChangeHandler("username", value)}
+                        autoCapitalize="none"
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Email"
+                        placeholder="Nhập email"
+                        value={registerInfo.email}
+                        onChangeText={(value) => onFormChangeHandler("email", value)}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Họ"
+                        placeholder="Nhập họ"
+                        value={registerInfo.first_name}
+                        onChangeText={(value) => onFormChangeHandler("first_name", value)}
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Tên"
+                        placeholder="Nhập tên"
+                        value={registerInfo.last_name}
+                        onChangeText={(value) => onFormChangeHandler("last_name", value)}
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Số điện thoại"
+                        placeholder="Nhập số điện thoại"
+                        value={registerInfo.phone}
+                        onChangeText={handleChangePhone}
+                        keyboardType="phone-pad"
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Mật khẩu"
+                        placeholder="Nhập mật khẩu"
+                        secureTextEntry={true}
+                        value={registerInfo.password}
+                        onChangeText={(value) => onFormChangeHandler("password", value)}
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    <TextInput
+                        mode="outlined"
+                        label="Xác nhận mật khẩu"
+                        placeholder="Nhập lại mật khẩu"
+                        secureTextEntry={true}
+                        value={confirmPassword}
+                        onChangeText={checkIdenticalConfirmedPass}
+                        theme={{ colors: { primary: '#4FC3F7' } }}
+                    />
+                    {errorVisible && (
+                        <ThemedText type={errorText.includes("thành công") ? "default" : "error"}>
+                            {errorText}
+                        </ThemedText>
+                    )}
+                    <Button
+                        style={{ backgroundColor: "#0091ff", marginTop: 5, borderRadius: 4 }}
+                        mode="contained"
+                        onPress={handleRegister}
+                        loading={register.isLoading}
+                        disabled={register.isLoading}
+                    >
+                        ĐĂNG KÝ
+                    </Button>
+                    <Link href="/login" style={styles.loginLink}>
+                        Đã có tài khoản? Đăng nhập
+                    </Link>
+                </View>
+            </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    titleContainer: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
+    container: {
+        flex: 1,
+        padding: 20,
+        backgroundColor: "#fff",
+        justifyContent: "center",
     },
-    stepContainer: {
-        gap: 8,
-        marginBottom: 8,
+    scrollContainer: {
+        padding: 20,
+        justifyContent: "center",
+        flexGrow: 1, // Important for ScrollView content to center properly
     },
-    reactLogo: {
-        height: 178,
-        width: 290,
-        bottom: 0,
-        left: 0,
-        position: "absolute",
+    title: {
+        fontSize: 24,
+        fontWeight: "bold",
+        marginVertical: 10,
+        textAlign: "center",
+        color: "#4FC3F7",
+    },
+    formContainer: {
+        width: "100%",
+        maxWidth: 400,
+        alignSelf: "center",
+    },
+    loginLink: {
+        textAlign: "center",
+        marginTop: 10,
+        textDecorationLine: "underline",
     },
 });

@@ -1,72 +1,73 @@
-import { router } from "expo-router";
-import { Image, StyleSheet, View } from "react-native";
+﻿import { router } from "expo-router";
+import { StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
 
 export default function AuthRootScreen() {
-  return (
-    <View style={styles.container}>
-      <View style={styles.image_container}>
-        <Image
-          style={styles.image}
-          source={require("@/assets/images/unauth-cover.jpg")}
-          resizeMode="cover"
-        ></Image>
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.content_title}>Zola</Text>
-        <View style={styles.button_container}>
-          <Button
-            textColor="white"
-            style={[styles.login, styles.button]}
-            onPress={() => {
-              router.navigate("./login");
-            }}
-          >
-            Đăng nhập
-          </Button>
-          <Button
-            textColor="white"
-            style={[styles.register, styles.button]}
-            onPress={() => {
-              router.navigate("./register");
-            }}
-          >
-            Tạo tài khoản mới
-          </Button>
+    return (
+        <View style={styles.container}>
+            <Text style={styles.title}>Zchat</Text>
+
+            <View style={styles.buttonContainer}>
+                <Button
+                    mode="contained"
+                    style={[styles.button, styles.loginButton]}
+                    labelStyle={styles.loginButtonLabel}
+                    onPress={() => router.navigate("./login")}
+                >
+                    ĐĂNG NHẬP
+                </Button>
+
+                <Button
+                    mode="outlined"
+                    style={[styles.button, styles.registerButton]}
+                    labelStyle={styles.registerButtonLabel}
+                    onPress={() => router.navigate("./register")}
+                >
+                    ĐĂNG KÝ
+                </Button>
+            </View>
         </View>
-      </View>
-    </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    height: "100%",
-  },
-  image_container: {
-    height: "60%",
-  },
-  image: { height: "100%", width: "100%" },
-  content: {
-    height: "40%",
-  },
-  content_title: {
-    color: "#0190f3",
-    fontWeight: "bold",
-    fontSize: 50,
-    textAlign: "center",
-    marginTop: 8,
-  },
-  button_container: {
-    flex: 1,
-    justifyContent: "flex-end",
-    paddingHorizontal: 24,
-  },
-  button: { marginBottom: 8, paddingVertical: 4 },
-  login: {
-    backgroundColor: "#0190f3",
-  },
-  register: {
-    backgroundColor: "gray",
-  },
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+        backgroundColor: "#fff",
+    },
+    title: {
+        fontSize: 60,
+        fontWeight: "bold",
+        marginBottom: 50,
+        color: "#4FC3F7", // Light blue color
+    },
+    buttonContainer: {
+        width: "100%",
+        maxWidth: 300,
+    },
+    button: {
+        marginVertical: 10,
+        paddingVertical: 5,
+        borderRadius: 5,
+    },
+    loginButton: {
+        backgroundColor: "#4FC3F7", // Light blue background
+    },
+    loginButtonLabel: {
+        color: "white", // White text for login
+        fontWeight: "bold",
+        fontSize: 16,
+    },
+    registerButton: {
+        borderColor: "#4FC3F7", // Light blue border
+        backgroundColor: "transparent",
+    },
+    registerButtonLabel: {
+        color: "black", // Black text for register
+        fontWeight: "bold",
+        fontSize: 16,
+    },
 });
