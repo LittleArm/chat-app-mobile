@@ -11,8 +11,6 @@ import { useMutation } from "react-query";
 import { authAPI } from "@/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedText } from "@/components/ThemedText";
-import useNotification from "@/hooks/useNotification";
-import { userAPI } from "@/api/user.api";
 
 export default function LoginScreen() {
   const [loginInfo, setLoginInfo] = useState({
@@ -22,35 +20,24 @@ export default function LoginScreen() {
   const [errorText, setErrorText] = useState("");
   const [errorVisible, setErrorVisible] = useState(false);
   const { setAccessToken, setUserId } = useAuth();
-  const token = useNotification();
-
-  const addFirebaseToken = useMutation(userAPI.addFirebaseToken);
 
   const {isLoading, mutate: login} = useMutation(authAPI.login, {
     onSuccess: async (response) => {
-      const { access_token, refresh_token, user, is_success } = response.data;
+      const { AccessToken, id, username } = response.data;
 
-      if (is_success) {
-        await AsyncStorage.setItem(STORAGE_KEY.ID, user.id);
-        await AsyncStorage.setItem(STORAGE_KEY.ACCESS_TOKEN, access_token);
-        await AsyncStorage.setItem(STORAGE_KEY.REFRESH_TOKEN, refresh_token);
+      if (AccessToken) {
+        await AsyncStorage.setItem(STORAGE_KEY.ID, id);
+        await AsyncStorage.setItem(STORAGE_KEY.ACCESS_TOKEN, AccessToken);
+        // If you have a refresh token in the new API, add it here
 
-        setUserId(user.id);
-        setAccessToken(access_token);
-
-        if (token) {
-          // console.log(token);
-          addFirebaseToken.mutate({ token });
-        }
+        setUserId(id);
+        setAccessToken(AccessToken);
 
         router.navigate("../(tabs)");
       }
     },
     onError: (error: any) => {
-      setError(error.message);
-      // enqueueSnackbar(error.response.data.message, {
-      //   variant: "error",
-      // });
+      setError(error.response?.data?.message || "Login failed");
     },
   });
 
@@ -118,14 +105,6 @@ export default function LoginScreen() {
           }}
         >
           Đăng ký mới
-        </Link>
-        <Link
-          href="/forgot-password"
-          style={{
-            color: "black",
-          }}
-        >
-          Quên mật khẩu?
         </Link>
       </ThemedView>
     </ParallaxScrollView>
