@@ -1,11 +1,13 @@
-import { Profile } from "./profile.entity";
-
 export class User {
-  id: string;
-  password: string;
-  phone: string;
-  created_date: Date;
-  refresh_token_list: string[];
-  active: boolean;
-  profile: Profile[];
+    CreateAt: Date;
+    UpdatedAt: Date;
+    DeletedAt: Date;
+    id: number;
+    username: string;
+    password: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    avatar: string;
+    phone: string;
 }
