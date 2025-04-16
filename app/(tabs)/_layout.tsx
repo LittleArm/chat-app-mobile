@@ -1,27 +1,36 @@
 import { TabBarIcon } from "@/components/navigation/TabBarIcon";
-import { useColorScheme } from "@/hooks/useColorScheme";
-import { Colors } from "@/utils/constants/Colors";
 import { Tabs } from "expo-router";
 import React from "react";
 
 export default function TabLayout() {
-    const colorScheme = useColorScheme();
-
     return (
         <Tabs
             screenOptions={{
-                tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
-                headerShown: true,
-                tabBarStyle: {
-                    backgroundColor: Colors[colorScheme ?? "light"].background,
-                    borderTopWidth: 0,
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    height: 60,
-                    width: "100%",
+                headerStyle: {
+                    backgroundColor: "#42A5F5", // Light blue header
+                    height: 120,
                 },
+                headerTitleStyle: {
+                    color: "#ffffff", // White title
+                    fontWeight: "bold",
+                    fontSize: 30,
+                },
+                tabBarShowLabel: true,
+                tabBarLabelStyle: {
+                    fontSize: 12,
+                    fontWeight: "500",
+                    marginBottom: 4,
+                },
+                tabBarStyle: {
+                    height: 60,
+                    paddingBottom: 6,
+                    paddingTop: 4,
+                    borderTopWidth: 0.5,
+                    borderTopColor: "#ddd",
+                    backgroundColor: "#ffffff",
+                },
+                tabBarActiveTintColor: "#42A5F5",
+                tabBarInactiveTintColor: "#999",
             }}
         >
             <Tabs.Screen
@@ -39,10 +48,10 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="contacts"
                 options={{
-                    title: "Danh bạ",
+                    title: "Bạn bè",
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
-                            name={focused ? "calendar" : "calendar-outline"}
+                            name={focused ? "person" : "person-outline"}
                             color={color}
                         />
                     ),
@@ -51,10 +60,10 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="settings"
                 options={{
-                    title: "Cá nhân",
+                    title: "Cài đặt",
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
-                            name={focused ? "person" : "person-outline"}
+                            name={focused ? "settings" : "settings-outline"}
                             color={color}
                         />
                     ),
