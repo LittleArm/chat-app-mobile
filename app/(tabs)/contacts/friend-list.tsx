@@ -1,6 +1,6 @@
 import { friendAPI } from "@/api/friend.api";
 import { Link, router, useFocusEffect } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import {
   FlatList,
   Image,
@@ -8,191 +8,251 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from "react-native";
 import { ActivityIndicator, IconButton, Searchbar } from "react-native-paper";
 import { useQuery, useQueryClient } from "react-query";
 
-const RenderItem = ({ userId, name, item, onCallPress }: ItemInfo) => {
-  const handleOnPress = () => {
-    router.push({
-      pathname: "/(chatbox)",
-      params: {
-        chatboxId: "",
-        avatar: item?.to_user_profile?.profile[0]?.avatar,
-        name,
-        toGroupId: "",
-        toUserId: item?.to_user_profile?.id,
-      },
-    });
-  };
-
-  const handleGoToBio = () => {
-    router.push({
-      pathname: "/(user)",
-      params: {
-        avatar: item?.to_user_profile?.profile[0]?.avatar,
-        name,
-        toUserId: item?.to_user_profile?.id,
-      },
-    });
-  };
-
-  return (
-    <TouchableOpacity onPress={handleOnPress}>
-      <View style={styles.itemContainer}>
-        <View style={styles.iconContainer}>
-          <TouchableOpacity onPress={handleGoToBio}>
-            <Image
-              source={{
-                uri: item?.to_user_profile?.profile[0]?.avatar
-                  ? `data:image/png;base64, ${item?.to_user_profile?.profile[0]?.avatar}`
-                  : undefined,
-              }}
-              style={styles.avatar}
-            />
-          </TouchableOpacity>
-          <Text style={styles.itemText}>{name}</Text>
-        </View>
-        <View style={styles.iconContainer}>
-          <TouchableOpacity onPress={() => onCallPress("audio")}>
-            <IconButton
-              icon="phone"
-              size={20}
-              iconColor="blue"
-              onPress={() => {}}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => onCallPress("video")}>
-            <IconButton
-              icon="video"
-              size={20}
-              iconColor="blue"
-              onPress={() => {}}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-const FriendListScreen = () => {
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const handleCallPress = (type: string) => {
-    // console.log(`Making ${type} call`);
-  };
-  const queryClient = useQueryClient();
-
-  const { isLoading, data, refetch } = useQuery({
-    queryKey: ["findFriendsByText", searchQuery],
-    queryFn: () => friendAPI.findByText({ text: searchQuery }),
-    enabled: false,
-    select: (rs) => {
-      return rs.data;
-    },
-  });
-
-  const handleSearchFriend = (text: string) => {
-    setSearchQuery(text);
-  };
-
-  useEffect(() => {
-    refetch();
-  }, [searchQuery]);
-
-  useEffect(() => {
-    return () => {
-      queryClient.removeQueries("findFriendsByText");
-    };
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      refetch();
-    }, [])
-  );
-
-  return (
-    <View>
-      <View style={styles.toolContainer}>
-        <Searchbar
-          placeholder="Tìm kiếm"
-          onChangeText={handleSearchFriend}
-          value={searchQuery}
-          style={styles.searchBar}
-        />
-      </View>
-      <Link href="/(chatbox)/friend-request/" style={styles.link}>
-        Lời mời kết bạn
-      </Link>
-      {isLoading ? (
-        <ActivityIndicator />
-      ) : (
-        <FlatList
-          scrollEnabled={true}
-          data={data}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <RenderItem
-              item={item}
-              name={item.to_user_profile.profile[0].fullname}
-              userId={item.from_user}
-              onCallPress={handleCallPress}
-            />
-          )}
-        />
-      )}
-    </View>
-  );
-};
-
-interface ItemInfo {
-  userId: string;
-  name: string;
-  item?: any;
-  onCallPress: (name: string) => void;
+interface FriendItem {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+    avatar: string;
 }
 
+const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCallPress: (type: "audio" | "video") => void }) => {
+    const fullName = `${item.first_name} ${item.last_name}`.trim() || item.username;
+    const avatarSource = item.avatar
+        ? { uri: item.avatar }
+        : require('@/assets/images/default-avatar.png');
+
+    const handleChatPress = useCallback(() => {
+        router.push({
+            pathname: "/(chatbox)",
+            params: {
+                chatboxId: "",
+                avatar: item.avatar,
+                name: fullName,
+                toGroupId: "",
+                toUserId: item.id.toString(),
+            },
+        });
+    }, [item, fullName]);
+
+    const handleGoToBio = useCallback(() => {
+        router.push({
+            pathname: "/(user)",
+            params: {
+                avatar: item.avatar,
+                name: fullName,
+                toUserId: item.id.toString(),
+            },
+        });
+    }, [item, fullName]);
+
+    return (
+        <TouchableOpacity onPress={handleChatPress}>
+            <View style={styles.itemContainer}>
+                <View style={styles.userInfoContainer}>
+                    <TouchableOpacity onPress={handleGoToBio}>
+                        <Image
+                            source={avatarSource}
+                            style={styles.avatar}
+                            defaultSource={require('@/assets/images/default-avatar.png')}
+                        />
+                    </TouchableOpacity>
+                    <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
+                        {fullName}
+                    </Text>
+                </View>
+                <View style={styles.callButtonsContainer}>
+                    <IconButton
+                        icon="phone"
+                        size={20}
+                        iconColor="#4285F4"
+                        onPress={() => onCallPress("audio")}
+                    />
+                    <IconButton
+                        icon="video"
+                        size={20}
+                        iconColor="#4285F4"
+                        onPress={() => onCallPress("video")}
+                    />
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
+const FriendListScreen = ({ userId }: { userId: string }) => {
+    const [searchQuery, setSearchQuery] = React.useState("");
+    const [isRefreshing, setIsRefreshing] = React.useState(false);
+    const queryClient = useQueryClient();
+
+    const { isLoading, data: friends, refetch } = useQuery({
+        queryKey: ["friends", userId],
+        queryFn: () => friendAPI.getFriends(friends),
+        select: (response) => response.data,
+    });
+
+    const filteredFriends = friends?.filter(friend => {
+        const fullName = `${friend.first_name} ${friend.last_name}`.toLowerCase();
+        const username = friend.username.toLowerCase();
+        const query = searchQuery.toLowerCase();
+        return fullName.includes(query) || username.includes(query);
+    }) || [];
+
+    const handleSearch = useCallback((text: string) => {
+        setSearchQuery(text);
+    }, []);
+
+    const handleCallPress = useCallback((type: "audio" | "video") => {
+        console.log(`Initiating ${type} call`);
+    }, []);
+
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        await refetch();
+        setIsRefreshing(false);
+    }, [refetch]);
+
+    useFocusEffect(
+        useCallback(() => {
+            refetch();
+        }, [refetch])
+    );
+
+    useEffect(() => {
+        return () => {
+            queryClient.removeQueries(["friends", userId]);
+        };
+    }, [queryClient, userId]);
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.headerContainer}>
+                <Searchbar
+                    placeholder="Tìm kiếm"
+                    onChangeText={handleSearch}
+                    value={searchQuery}
+                    style={styles.searchBar}
+                    inputStyle={styles.searchInput}
+                    iconColor="#4285F4"
+                />
+            </View>
+
+            <Link href="/(chatbox)/friend-request/" style={styles.friendRequestLink}>
+                <Text style={styles.friendRequestText}>Lời mời kết bạn</Text>
+            </Link>
+
+            {isLoading && !isRefreshing ? (
+                <ActivityIndicator style={styles.loader} size="large" color="#4285F4" />
+            ) : (
+                <FlatList
+                    data={filteredFriends}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <RenderItem item={item} onCallPress={handleCallPress} />
+                    )}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={handleRefresh}
+                            colors={["#4285F4"]}
+                        />
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>
+                                {searchQuery ? "No matching friends found" : "No friends yet"}
+                            </Text>
+                        </View>
+                    }
+                    contentContainerStyle={filteredFriends.length === 0 && styles.emptyListContainer}
+                />
+            )}
+        </View>
+    );
+};
+
 const styles = StyleSheet.create({
-  searchBar: {
-    flex: 1,
-    marginRight: 10,
-    backgroundColor: "#fff",
-  },
-  itemContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 8,
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
-  },
-  itemText: {
-    fontSize: 16,
-  },
-  iconContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 5,
-  },
-  link: {
-    padding: 10,
-    justifyContent: "center",
-    color: "black",
-  },
-  toolContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 10,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#f5f5f5',
+    },
+    headerContainer: {
+        padding: 10,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    searchBar: {
+        backgroundColor: '#f1f3f4',
+        borderRadius: 20,
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+    searchInput: {
+        fontSize: 14,
+    },
+    friendRequestLink: {
+        padding: 16,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    friendRequestText: {
+        color: '#4285F4',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    itemContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#fff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    userInfoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: 10,
+    },
+    callButtonsContainer: {
+        flexDirection: 'row',
+    },
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 12,
+        backgroundColor: '#e0e0e0',
+    },
+    itemText: {
+        fontSize: 16,
+        color: '#202124',
+        flexShrink: 1,
+    },
+    loader: {
+        marginTop: 20,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#5f6368',
+    },
+    emptyListContainer: {
+        flex: 1,
+    },
 });
 
 export default FriendListScreen;

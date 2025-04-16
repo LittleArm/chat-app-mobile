@@ -1,281 +1,293 @@
-import { SimpleMenu } from "@/components/Menu";
-import React, { useEffect } from "react";
-import {
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { ActivityIndicator, Searchbar, Badge } from "react-native-paper";
-import { router, useFocusEffect } from "expo-router";
-import { MESSAGE_MENU_ITEMS } from "@/utils/constants/message-menu-items";
-import { useChat } from "@/contexts/ChatContext";
-import { useMutation, useQuery, useQueryClient } from "react-query";
-import { chatAPI } from "@/api/chat.api";
-import { ChatBox } from "@/types/entities";
-import { wp } from "@/helpers";
-import moment from "moment";
-import "moment/locale/vi";
-import { useToast } from "react-native-paper-toast";
-moment.locale("vi");
-import messaging from "@react-native-firebase/messaging";
+﻿import React, { useState, useEffect, useCallback } from 'react';
+import { ActivityIndicator } from 'react-native-paper';
+import { FlatList, View, Text, TouchableOpacity, Image, RefreshControl, StyleSheet } from 'react-native';
+import { Searchbar } from 'react-native-paper';
+import { useQuery } from 'react-query';
+import { STORAGE_KEY } from '@/utils/constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { conversationAPI } from '@/api/conversation.api';
+import { router } from 'expo-router';
+import moment from 'moment';
+import 'moment/locale/vi';
 
-interface ListItemProps {
-  avatar?: string;
-  name?: string;
-  item?: ChatBox;
-  lastMessage?: string;
-  time?: string;
-  isNewMessage?: boolean;
-  onPress: () => void;
+moment.locale('vi');
+
+interface ConversationWithLastMessage {
+    conversation: {
+        id: number;
+        type: string;
+        creator_id: number;
+        participants: number[];
+    };
+    lastMessage?: {
+        content: string;
+        createAt: Date;
+    };
+    name?: string; // Added for participant names
 }
 
-const ListItem = ({
-  item,
-  avatar,
-  name,
-  lastMessage,
-  time,
-  isNewMessage,
-  onPress,
-}: ListItemProps) => {
-  return (
-    <TouchableOpacity onPress={onPress}>
-      <View style={styles.itemContainer}>
-        <View style={{ width: "15%" }}>
-          <Image
-            source={{
-              uri: `data:image/png;base64, ${avatar}`,
-            }}
-            style={styles.avatar}
-          />
-        </View>
-        <View style={{ width: "85%" }}>
-          <View
-            style={{
-              justifyContent: "space-between",
-              flexDirection: "row",
-            }}
-          >
-            <Text style={styles.name}>{name}</Text>
-            <Text style={isNewMessage ? styles.newMessage : styles.message}>
-              {time}
-            </Text>
-          </View>
-          <View
-            style={{
-              justifyContent: "space-between",
-              flexDirection: "row",
-            }}
-          >
-            <Text style={isNewMessage ? styles.newMessage : styles.message}>
-              {lastMessage}
-            </Text>
-            {isNewMessage && <Badge size={12}></Badge>}
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-};
+const ConversationListScreen = () => {
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [enrichedConversations, setEnrichedConversations] = useState<ConversationWithLastMessage[]>([]);
 
-const FriendListSreen = () => {
-  const [searchQuery, setSearchQuery] = React.useState("");
-  const {
-    toUserId,
-    toGroupId,
-    chatboxId,
-    setChatboxId,
-    setToUserId,
-    setToGroupId,
-    setChatProfile,
-  } = useChat();
-  const queryClient = useQueryClient();
-  const toaster = useToast();
-
-  const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["GetChatBoxListByUser"],
-    queryFn: () => chatAPI.listChatBox(),
-    enabled: false,
-    select: (rs) => {
-      return rs.data;
-    },
-  });
-
-  const setSeen = useMutation(chatAPI.setChatboxSeen, {
-    onSuccess: (res) => {
-      if (res.data) {
-        // queryClient.invalidateQueries(["GetChatBoxListByUser"]);
-        refetch();
-      }
-    },
-    onError: (err: any) => {
-      toaster.show({
-        message: err,
-        duration: 2000,
-        type: "error",
-      });
-    },
-  });
-
-  const handleSearchMessage = (text: string) => {
-    setSearchQuery(text);
-  };
-
-  const handleItemPress = (chatbox: ChatBox, avatar: string, name: string) => {
-    const { id } = chatbox;
-    if (chatbox.new_message) {
-      setSeen.mutate(id);
-    }
-    if (chatbox.to_group_profile) {
-      router.push({
-        pathname: "/(chatbox)/group-chatbox",
-        params: {
-          chatboxId: id,
-          avatar,
-          name,
-          toGroupId: chatbox.to_group_profile.id,
-          toUserId: "",
-        },
-      });
-    } else {
-      router.push({
-        pathname: "/(chatbox)",
-        params: {
-          chatboxId: id,
-          avatar,
-          name,
-          toGroupId: "",
-          toUserId: chatbox.to_user_profile.id,
-        },
-      });
-    }
-  };
-
-  useEffect(() => {
-    // refetch();
-    messaging().onMessage(async (remoteMessage) => {
-      console.log("A new FCM message arrived!", JSON.stringify(remoteMessage));
-      refetch();
-    });
-    return () => {
-      queryClient.removeQueries("GetChatBoxListByUser");
-    };
-  }, []);
-
-  // useEffect(() => {
-  //   return () => {
-  //     setProfile({
-  //       fullname: "",
-  //       avatar: "",
-  //       id: "",
-  //     });
-  //   };
-  // }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      refetch();
-    }, [])
-  );
-
-  return (
-    <View>
-      <View style={styles.barContainer}>
-        <Searchbar
-          placeholder="Search"
-          onChangeText={handleSearchMessage}
-          value={searchQuery}
-          style={styles.searchBar}
-        />
-        <SimpleMenu items={MESSAGE_MENU_ITEMS} />
-      </View>
-      {isLoading ? (
-        <ActivityIndicator />
-      ) : (
-        <FlatList
-          scrollEnabled={true}
-          data={data ? data.data : []}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => {
-            let avatar: string, name: string;
-            if (item.to_group_profile) {
-              avatar = item.to_group_profile.avatar;
-              name = item.to_group_profile.name;
-            } else {
-              avatar = item.to_user_profile.profile[0].avatar;
-              name = item.to_user_profile.profile[0].fullname;
+    // Load user ID
+    useEffect(() => {
+        const loadUserId = async () => {
+            try {
+                const userId = await AsyncStorage.getItem(STORAGE_KEY.ID);
+                if (userId) setCurrentUserId(Number(userId));
+            } catch (error) {
+                console.error('Failed to load user ID:', error);
             }
-            const lastMessage = item.chatbox_chatlogs[0].chat_log.content;
-            const time = moment(item.latest_updated_date).fromNow();
-            return (
-              <ListItem
-                key={item.id}
-                avatar={avatar}
-                name={name}
-                item={item}
-                lastMessage={lastMessage}
-                time={time}
-                isNewMessage={item.new_message}
-                onPress={() => handleItemPress(item, avatar, name)}
-              />
+        };
+        loadUserId();
+    }, []);
+
+    // Fetch conversations
+    const { data: conversationsData, isLoading, refetch } = useQuery(
+        ['conversations', currentUserId],
+        async () => {
+            const response = await conversationAPI.listConversations(currentUserId!);
+            return response;
+        },
+        { enabled: !!currentUserId }
+    );
+
+    // Fetch last message and participant names for each conversation
+    useEffect(() => {
+        const fetchConversationDetails = async () => {
+            if (!conversationsData || !Array.isArray(conversationsData)) {
+                console.warn('No valid conversations data');
+                setEnrichedConversations([]);
+                return;
+            }
+
+            const results = await Promise.all(
+                conversationsData.map(async (conv) => {
+                    try {
+                        // Fetch messages
+                        const messagesResponse = await conversationAPI.chatDetail(conv.id);
+                        const messages = messagesResponse;
+
+                        // Get last message
+                        const lastMessage = messages.length > 0
+                            ? messages.reduce((latest, current) =>
+                                new Date(current.createAt) > new Date(latest.createAt) ? current : latest
+                            )
+                            : undefined;
+
+                        // Get participant names (you'll need to implement this API)
+                        // const participantNames = await getParticipantNames(conv.participants);
+                        // For now, we'll use a placeholder
+                        const participantNames = ['User 1', 'User 2']; // Replace with actual API call
+
+                        return {
+                            conversation: conv,
+                            name: participantNames.join(', '),
+                            lastMessage: lastMessage ? {
+                                content: lastMessage.content,
+                                createAt: lastMessage.createAt
+                            } : undefined
+                        };
+                    } catch (error) {
+                        console.error(`Error processing conversation ${conv.id}:`, error);
+                        return {
+                            conversation: conv,
+                            name: `Conversation ${conv.id}`
+                        };
+                    }
+                })
             );
-          }}
-        />
-      )}
-    </View>
-  );
+
+            setEnrichedConversations(results);
+        };
+
+        fetchConversationDetails();
+    }, [conversationsData]);
+
+    const handleRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        try {
+            await refetch();
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [refetch]);
+
+    const filteredConversations = enrichedConversations.filter(({ conversation, name }) => {
+        const searchLower = searchQuery.toLowerCase();
+        return (
+            name?.toLowerCase().includes(searchLower) ||
+            conversation.id.toString().toLowerCase().includes(searchLower)
+        );
+    });
+
+    return (
+        <View style={styles.container}>
+            {/* Search Bar */}
+            <Searchbar
+                placeholder="Search"
+                onChangeText={setSearchQuery}
+                value={searchQuery}
+                style={styles.searchBar}
+                inputStyle={styles.searchInput}
+            />
+
+            {/* Conversation List */}
+            {isLoading ? (
+                <ActivityIndicator style={styles.loader} />
+            ) : (
+                <FlatList
+                    data={filteredConversations}
+                    keyExtractor={(item) => item.conversation.id.toString()}
+                    renderItem={({ item }) => {
+                        const lastMessageContent = item.lastMessage?.content || 'No messages yet';
+                        const lastMessageTime = item.lastMessage?.createAt
+                            ? moment(item.lastMessage.createAt).format('h:mm A') // Changed to 12-hour format
+                            : '';
+
+                        return (
+                            <TouchableOpacity
+                                style={styles.conversationItem}
+                                onPress={() => router.push({
+                                    pathname: '/(chatbox)',
+                                    params: {
+                                        conversationId: item.conversation.id,
+                                        name: item.name
+                                    }
+                                })}
+                            >
+                                <Image
+                                    source={require('@/assets/images/default-avatar.png')}
+                                    style={styles.avatar}
+                                />
+                                <View style={styles.conversationContent}>
+                                    <View style={styles.conversationHeader}>
+                                        <Text style={styles.conversationName}>{item.name}</Text>
+                                        <Text style={styles.conversationTime}>{lastMessageTime}</Text>
+                                    </View>
+                                    <Text
+                                        style={styles.conversationMessage}
+                                        numberOfLines={1}
+                                        ellipsizeMode="tail"
+                                    >
+                                        {lastMessageContent}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
+                    ItemSeparatorComponent={() => <View style={styles.separator} />}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isRefreshing}
+                            onRefresh={handleRefresh}
+                        />
+                    }
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>
+                                {searchQuery ? 'No matching conversations' : 'No conversations yet'}
+                            </Text>
+                        </View>
+                    }
+                />
+            )}
+        </View>
+    );
 };
 
 const styles = StyleSheet.create({
-  barContainer: {
-    flexDirection: "row",
-    padding: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  searchBar: {
-    flex: 12,
-    marginRight: 10,
-    marginBottom: 10,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemContainer: {
-    flexDirection: "row",
-    padding: 10,
-    // alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    width: wp(100),
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 10,
-  },
-  name: {
-    fontSize: 18,
-  },
-  message: {
-    fontSize: 16,
-    color: "gray",
-  },
-  newMessage: {
-    fontSize: 16,
-  },
-  detailContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  detailText: {
-    fontSize: 22,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    header: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+    },
+    searchBar: {
+        margin: 10,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 10,
+        elevation: 0,
+    },
+    searchInput: {
+        fontSize: 14,
+        minHeight: 36,
+    },
+    conversationItem: {
+        flexDirection: 'row',
+        padding: 16,
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginRight: 16,
+    },
+    conversationContent: {
+        flex: 1,
+    },
+    conversationHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    conversationName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    conversationTime: {
+        fontSize: 12,
+        color: '#666',
+    },
+    conversationMessage: {
+        fontSize: 14,
+        color: '#666',
+    },
+    separator: {
+        height: 1,
+        backgroundColor: '#eee',
+        marginLeft: 82, // Avatar width + margin
+    },
+    loader: {
+        marginTop: 20,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        fontSize: 16,
+        color: '#757575',
+    },
+    bottomNav: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        padding: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#eee',
+    },
+    navItem: {
+        fontSize: 16,
+        color: '#666',
+    },
+    navItemActive: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#000',
+    },
 });
 
-export default FriendListSreen;
+export default ConversationListScreen;

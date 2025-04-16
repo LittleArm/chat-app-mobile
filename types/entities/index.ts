@@ -5,3 +5,6 @@ export * from "./chatbox.entity";
 export * from "./chatlog.entity";
 export * from "./chatboxchatlog.entity";
 export * from "./groupmembers.entity";
+export * from "./participant.entity";
+export * from "./conversation.entity";
+export * from "./message.entity";

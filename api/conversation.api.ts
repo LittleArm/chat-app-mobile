@@ -1,26 +1,40 @@
 import http from "../utils/http";
+import { MessageResponse } from "../types/api/response/message.response";
+import { ConversationByUserResult } from "../types/api/response/conversation";
 
 export const CONVERSATION_URL = {
+    LIST_CONVERSATIONS: "/conversations/:userId",
+    CHAT_DETAIL: "/messages/:conversationId",
     CREATE_CONVERSATION: "/ws/createConversation",
     JOIN_CONVERSATION: "/ws/joinConversation/:conversationId",
-    GET_CONVERSATIONS: "/ws/getConversations",
+    //GET_CONVERSATIONS: "/ws/getConversations",
     GET_CLIENTS: "/ws/getClients/:conversationId",
 };
 
 export const conversationAPI = {
+    listConversations(userId: number): Promise<ConversationByUserResult[]> {
+        return http.get<{ conversations: ConversationByUserResult[] }>(
+            CONVERSATION_URL.LIST_CONVERSATIONS.replace(":userId", userId.toString())
+        ).then(response => response.data.conversations);
+    },
+    chatDetail(conversationId: number): Promise<MessageResponse[]> {
+        return http.get<{ messages: MessageResponse[] }>(
+            CONVERSATION_URL.CHAT_DETAIL.replace(":conversationId", conversationId.toString())
+        ).then(response => response.data.messages);
+    },
     createConversation(conversationData: any) {
         return http.post<{ message: string }>(CONVERSATION_URL.CREATE_CONVERSATION, conversationData);
     },
 
-    joinConversation(conversationId: string) {
-        return http.get<{ message: string }>(CONVERSATION_URL.JOIN_CONVERSATION.replace(":conversationId", conversationId));
+    joinConversation(conversationId: number) {
+        return http.get<{ message: string }>(CONVERSATION_URL.JOIN_CONVERSATION.replace(":conversationId", conversationId.toString()));
     },
 
-    getConversations() {
-        return http.get<{ conversations: any[] }>(CONVERSATION_URL.GET_CONVERSATIONS);
-    },
+    //getConversations() {
+    //    return http.get<{ conversations: any[] }>(CONVERSATION_URL.GET_CONVERSATIONS);
+    //},
 
-    getClients(conversationId: string) {
-        return http.get<{ clients: any[] }>(CONVERSATION_URL.GET_CLIENTS.replace(":conversationId", conversationId));
+    getClients(conversationId: number) {
+        return http.get<{ clients: any[] }>(CONVERSATION_URL.GET_CLIENTS.replace(":conversationId", conversationId.toString()));
     }
 };
