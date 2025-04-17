@@ -1,4 +1,3 @@
-import { useChat } from "@/contexts/ChatContext";
 import { router, useFocusEffect } from "expo-router";
 import React, {
   FC,
@@ -22,12 +21,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { FontAwesome } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMutation, useQuery, useQueryClient } from "react-query";
-import { useToast } from "react-native-paper-toast";
 import { useLocalSearchParams } from 'expo-router';
 import { conversationAPI } from "@/api/conversation.api";
-import { User_Info_Response } from "@/types/api/response/user_info.response";
-import { MessageResponse } from "@/types/api/response/message.response";
+import { STORAGE_KEY } from "@/utils/constants";
+// import { User_Info_Response } from "@/types/api/response/user_info.response";
+// import { MessageResponse } from "@/types/api/response/message.response";
 
 interface ChatInputProps {
   reset?: number;
@@ -75,12 +73,14 @@ const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
 
   const username = userInfo.username || "Unknown";
     // console.log("Username:", username); // Debugging line
-  
+
+  //removing "http://"
+  const websocketURL = STORAGE_KEY.CHAT_SOCKET_BASE_URL.replace("http://", "");
   const conversationId = params.conversationId?.toString() || "";
   const ws = useRef<WebSocket | null>(null); 
 
   useEffect(() => {
-    const socketUrl = `ws://192.168.1.117:5050/ws/joinConversation/${conversationId}?userId=${userId}&username=${username}`;
+    const socketUrl = `ws://${websocketURL}/ws/joinConversation/${conversationId}?userId=${userId}&username=${username}`;
     ws.current = new WebSocket(socketUrl);
 
     ws.current.onopen = () => {
