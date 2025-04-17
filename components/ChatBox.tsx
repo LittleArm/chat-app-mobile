@@ -38,43 +38,49 @@ const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
 // const ChatInput: FC<ChatInputProps> = (props) => {
   const { userId } = useAuth();
   const params = useLocalSearchParams();
-  const [userInfo, setUserInfo] = useState<User_Info_Response | null>(null);
   const [inputMessage, setInputMessage] = useState("");
 
-  // Fetch user info when component mounts
-//   useEffect(() => {
-//     const fetchUserInfo = async () => {
-//       try {
-//         const userData = await conversationAPI.getUserInfo_chatbox(Number(userId));
-//         setUserInfo(userData.data);
-//       } catch (error) {
-//         console.error("Failed to fetch user info:", error);
-//         // Set default values if fetch fails
-//         setUserInfo({
-//           id: userId.toString(),
-//           username: "User",
-//           email: "",
-//           phone: "",
-//           first_name: "",
-//           last_name: "",
-//           avatar: "",
-//           created_at: new Date().toISOString(),
-//           updated_at: new Date().toISOString()
-//         });
-//       }
-//     };
+  const [userInfo, setUserInfo] = useState({
+    id: userId?.toString() || "",
+    username: "User",
+    email: "",
+    phone: "",
+    first_name: "",
+    last_name: "",
+    avatar: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  });
 
-//     if (userId) {
-//       fetchUserInfo();
-//     }
-//   }, [userId]);
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await conversationAPI.getUserInfo_chatbox(Number(userId));
+        if (response.data) {
+          setUserInfo(prev => ({
+            ...prev,  // Keep existing defaults for missing fields
+            ...response.data  // Overwrite with API data
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch user info:", error);
+        // State already has defaults, no need to set
+      }
+    };
+  
+    if (userId) {
+      fetchUserInfo();
+    }
+  }, [userId]);
 
-//   const username = userInfo?.username || "Unknown";
+  const username = userInfo.username || "Unknown";
+    // console.log("Username:", username); // Debugging line
+  
   const conversationId = params.conversationId?.toString() || "";
   const ws = useRef<WebSocket | null>(null); 
 
   useEffect(() => {
-    const socketUrl = `ws://192.168.1.117:5050/ws/joinConversation/${conversationId}?userId=${userId}&username=test1`;
+    const socketUrl = `ws://192.168.1.117:5050/ws/joinConversation/${conversationId}?userId=${userId}&username=${username}`;
     ws.current = new WebSocket(socketUrl);
 
     ws.current.onopen = () => {
@@ -84,7 +90,7 @@ const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
     return () => {
       ws.current?.close();
     };
-  }, [conversationId, userId, 'test1']);
+  }, [conversationId, userId, username]);
 
   useEffect(() => {
     setInputMessage("");
