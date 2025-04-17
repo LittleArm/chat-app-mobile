@@ -11,7 +11,7 @@ import {
     RefreshControl,
 } from "react-native";
 import { ActivityIndicator, IconButton, Searchbar } from "react-native-paper";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery } from "react-query";
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -37,27 +37,29 @@ const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCall
     );
 
     const handleChatPress = useCallback(() => {
-        router.push({
-            pathname: "/(chatbox)",
-            params: {
-                chatboxId: "",
-                avatar: item.avatar,
-                name: fullName,
-                toGroupId: "",
-                toUserId: item.id.toString(),
-            },
-        });
+        console.log("Chat Press");
+        //router.push({
+        //    pathname: "/(chatbox)",
+        //    params: {
+        //        chatboxId: "",
+        //        avatar: item.avatar,
+        //        name: fullName,
+        //        toGroupId: "",
+        //        toUserId: item.id.toString(),
+        //    },
+        //});
     }, [item, fullName]);
 
     const handleGoToBio = useCallback(() => {
-        router.push({
-            pathname: "/(user)",
-            params: {
-                avatar: item.avatar,
-                name: fullName,
-                toUserId: item.id.toString(),
-            },
-        });
+        console.log("Bio Press");
+        //router.push({
+        //    pathname: "/(user)",
+        //    params: {
+        //        avatar: item.avatar,
+        //        name: fullName,
+        //        toUserId: item.id.toString(),
+        //    },
+        //});
     }, [item, fullName]);
 
     return (
@@ -120,14 +122,18 @@ const FriendListScreen = () => {
 
     const { isLoading, data: friends, refetch } = useQuery({
         queryKey: ["friends", currentUserId],
-        queryFn: () => friendAPI.getFriends(currentUserId),
+        queryFn: () => {
+            return friendAPI.getFriends(currentUserId);
+        },
         select: (response) => response.data,
         enabled: !!currentUserId,
     });
 
     const { data: friendRequests } = useQuery({
-        queryKey: ["friendRequests", currentUserId],
-        queryFn: () => friendAPI.getReceivedFriendRequests(currentUserId),
+        queryKey: ["friendRequests", currentUserId],        
+        queryFn: () => {
+            return friendAPI.getReceivedFriendRequests(currentUserId);
+        },
         select: (response) => response.data,
         enabled: !!currentUserId,
     });
@@ -236,13 +242,14 @@ const styles = StyleSheet.create({
         borderBottomColor: '#e0e0e0',
     },
     searchBar: {
-        backgroundColor: '#f1f3f4',
-        borderRadius: 20,
+        margin: 10,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 10,
         elevation: 0,
-        shadowOpacity: 0,
     },
     searchInput: {
-        fontSize: 16,
+        fontSize: 14,
+        minHeight: 36,
     },
     friendRequestButton: {
         flexDirection: 'row',

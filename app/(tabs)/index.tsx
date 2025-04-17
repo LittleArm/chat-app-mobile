@@ -97,7 +97,6 @@ const ConversationListScreen = () => {
     useEffect(() => {
         const fetchConversationDetails = async () => {
             if (!conversationsData || !Array.isArray(conversationsData) || !currentUserId) {
-                console.warn('No valid conversations data or user ID');
                 setEnrichedConversations([]);
                 return;
             }
