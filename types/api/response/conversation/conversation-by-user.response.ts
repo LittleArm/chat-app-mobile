@@ -1,8 +1,8 @@
 import { Conversation, Participant } from "../../../entities";
 
 export type ConversationByUserResult = {
-    id: number;
-    type: string;
-    creator_id: number;
-    participants: number[];
+    id: Conversation["id"];
+    type: Conversation["type"];
+    creator_id: Conversation["creator_id"];
+    participants: Participant["user_id"][];
 };

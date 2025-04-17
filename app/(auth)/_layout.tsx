@@ -6,8 +6,8 @@ export default function AuthLayout() {
     return (
         <Stack>
             <Stack.Screen options={{ headerShown: false }} name="index" />
-            <Stack.Screen options={{ headerTitle: "Đăng nhập" }} name="login" />
-            <Stack.Screen options={{ headerTitle: "Đăng ký" }} name="register" />
+            <Stack.Screen options={{ headerShown: false }} name="login" />
+            <Stack.Screen options={{ headerShown: false }} name="register" />
         </Stack>
     );
 }

@@ -24,10 +24,10 @@ export const friendAPI = {
     getSentFriendRequests(userId: string) {
         return http.get<FriendRequestResponse[]>(FRIEND_URL.SENT_FRIEND_REQUESTS.replace(":userId", userId));
     },
-    getReceivedFriendRequests(friendId: string) {
-        return http.get<FriendRequestResponse[]>(FRIEND_URL.RECEIVED_FRIEND_REQUESTS.replace(":friendId", friendId));
+    getReceivedFriendRequests(friendId: number) {
+        return http.get<FriendRequestResponse[]>(FRIEND_URL.RECEIVED_FRIEND_REQUESTS.replace(":friendId", friendId.toString()));
     },
-    getFriends(userId: string) {
-        return http.get<FriendResponse[]>(FRIEND_URL.GET_FRIENDS.replace(":userId", userId));
+    getFriends(userId: number) {
+        return http.get<FriendResponse[]>(FRIEND_URL.GET_FRIENDS.replace(":userId", userId.toString()));
     }
 };

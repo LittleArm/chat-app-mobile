@@ -36,7 +36,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="index"
                 options={{
-                    title: "Tin nhắn",
+                    title: "Chats",
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name={focused ? "chatbox" : "chatbox-outline"}
@@ -48,7 +48,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="contacts"
                 options={{
-                    title: "Bạn bè",
+                    title: "Friends",
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name={focused ? "person" : "person-outline"}
@@ -60,7 +60,7 @@ export default function TabLayout() {
             <Tabs.Screen
                 name="settings"
                 options={{
-                    title: "Cài đặt",
+                    title: "Settings",
                     tabBarIcon: ({ color, focused }) => (
                         <TabBarIcon
                             name={focused ? "settings" : "settings-outline"}

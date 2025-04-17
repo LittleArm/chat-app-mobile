@@ -1,17 +1,19 @@
 import { friendAPI } from "@/api/friend.api";
 import { Link, router, useFocusEffect } from "expo-router";
-import React, { useEffect, useCallback, useState } from "react";
+import React, { useEffect, useCallback, useState, useMemo } from "react";
 import {
-  FlatList,
-  Image,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  RefreshControl,
+    FlatList,
+    Image,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    RefreshControl,
 } from "react-native";
 import { ActivityIndicator, IconButton, Searchbar } from "react-native-paper";
 import { useQuery, useQueryClient } from "react-query";
+import { STORAGE_KEY } from '@/utils/constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface FriendItem {
     id: number;
@@ -22,10 +24,17 @@ interface FriendItem {
 }
 
 const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCallPress: (type: "audio" | "video") => void }) => {
-    const fullName = `${item.first_name} ${item.last_name}`.trim() || item.username;
-    const avatarSource = item.avatar
-        ? { uri: item.avatar }
-        : require('@/assets/images/default-avatar.png');
+    const fullName = useMemo(() =>
+        `${item.first_name} ${item.last_name}`.trim() || item.username,
+        [item.first_name, item.last_name, item.username]
+    );
+
+    const avatarSource = useMemo(() =>
+        item.avatar
+            ? { uri: item.avatar }
+            : require('@/assets/images/default-avatar.png'),
+        [item.avatar]
+    );
 
     const handleChatPress = useCallback(() => {
         router.push({
@@ -56,15 +65,19 @@ const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCall
             <View style={styles.itemContainer}>
                 <View style={styles.userInfoContainer}>
                     <TouchableOpacity onPress={handleGoToBio}>
-                        <Image
-                            source={avatarSource}
-                            style={styles.avatar}
-                            defaultSource={require('@/assets/images/default-avatar.png')}
-                        />
+                        <View style={styles.avatarContainer}>
+                            <Image
+                                source={avatarSource}
+                                style={styles.avatar}
+                                defaultSource={require('@/assets/images/default-avatar.png')}
+                            />
+                        </View>
                     </TouchableOpacity>
-                    <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
-                        {fullName}
-                    </Text>
+                    <View style={styles.textContainer}>
+                        <Text style={styles.itemText} numberOfLines={1} ellipsizeMode="tail">
+                            {fullName}
+                        </Text>
+                    </View>
                 </View>
                 <View style={styles.callButtonsContainer}>
                     <IconButton
@@ -72,12 +85,14 @@ const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCall
                         size={20}
                         iconColor="#4285F4"
                         onPress={() => onCallPress("audio")}
+                        style={styles.callButton}
                     />
                     <IconButton
                         icon="video"
                         size={20}
                         iconColor="#4285F4"
                         onPress={() => onCallPress("video")}
+                        style={styles.callButton}
                     />
                 </View>
             </View>
@@ -85,23 +100,50 @@ const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCall
     );
 });
 
-const FriendListScreen = ({ userId }: { userId: string }) => {
+const FriendListScreen = () => {
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = React.useState("");
     const [isRefreshing, setIsRefreshing] = React.useState(false);
-    const queryClient = useQueryClient();
+
+    // Load user ID
+    useEffect(() => {
+        const loadUserId = async () => {
+            try {
+                const userId = await AsyncStorage.getItem(STORAGE_KEY.ID);
+                if (userId) setCurrentUserId(Number(userId));
+            } catch (error) {
+                console.error('Failed to load user ID:', error);
+            }
+        };
+        loadUserId();
+    }, []);
 
     const { isLoading, data: friends, refetch } = useQuery({
-        queryKey: ["friends", userId],
-        queryFn: () => friendAPI.getFriends(friends),
+        queryKey: ["friends", currentUserId],
+        queryFn: () => friendAPI.getFriends(currentUserId),
         select: (response) => response.data,
+        enabled: !!currentUserId,
     });
 
-    const filteredFriends = friends?.filter(friend => {
-        const fullName = `${friend.first_name} ${friend.last_name}`.toLowerCase();
-        const username = friend.username.toLowerCase();
-        const query = searchQuery.toLowerCase();
-        return fullName.includes(query) || username.includes(query);
-    }) || [];
+    const { data: friendRequests } = useQuery({
+        queryKey: ["friendRequests", currentUserId],
+        queryFn: () => friendAPI.getReceivedFriendRequests(currentUserId),
+        select: (response) => response.data,
+        enabled: !!currentUserId,
+    });
+
+    const friendRequestCount = friendRequests?.length || 0;
+
+    const filteredFriends = useMemo(() => {
+        if (!friends) return [];
+
+        return friends.filter(friend => {
+            const fullName = `${friend.first_name} ${friend.last_name}`.toLowerCase();
+            const username = friend.username.toLowerCase();
+            const query = searchQuery.toLowerCase();
+            return fullName.includes(query) || username.includes(query);
+        });
+    }, [friends, searchQuery]);
 
     const handleSearch = useCallback((text: string) => {
         setSearchQuery(text);
@@ -113,8 +155,11 @@ const FriendListScreen = ({ userId }: { userId: string }) => {
 
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
-        await refetch();
-        setIsRefreshing(false);
+        try {
+            await refetch();
+        } finally {
+            setIsRefreshing(false);
+        }
     }, [refetch]);
 
     useFocusEffect(
@@ -123,27 +168,29 @@ const FriendListScreen = ({ userId }: { userId: string }) => {
         }, [refetch])
     );
 
-    useEffect(() => {
-        return () => {
-            queryClient.removeQueries(["friends", userId]);
-        };
-    }, [queryClient, userId]);
-
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <Searchbar
-                    placeholder="Tìm kiếm"
+                    placeholder="Search friends"
                     onChangeText={handleSearch}
                     value={searchQuery}
                     style={styles.searchBar}
                     inputStyle={styles.searchInput}
                     iconColor="#4285F4"
+                    theme={{ colors: { primary: '#4285F4' } }}
                 />
             </View>
 
-            <Link href="/(chatbox)/friend-request/" style={styles.friendRequestLink}>
-                <Text style={styles.friendRequestText}>Lời mời kết bạn</Text>
+            <Link href="/(chatbox)/friend-request/" asChild>
+                <TouchableOpacity style={styles.friendRequestButton}>
+                    <Text style={styles.friendRequestText}>Friend Requests</Text>
+                    {friendRequestCount > 0 && (
+                        <View style={styles.friendRequestBadge}>
+                            <Text style={styles.friendRequestBadgeText}>{friendRequestCount}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
             </Link>
 
             {isLoading && !isRefreshing ? (
@@ -160,6 +207,7 @@ const FriendListScreen = ({ userId }: { userId: string }) => {
                             refreshing={isRefreshing}
                             onRefresh={handleRefresh}
                             colors={["#4285F4"]}
+                            tintColor="#4285F4"
                         />
                     }
                     ListEmptyComponent={
@@ -169,7 +217,7 @@ const FriendListScreen = ({ userId }: { userId: string }) => {
                             </Text>
                         </View>
                     }
-                    contentContainerStyle={filteredFriends.length === 0 && styles.emptyListContainer}
+                    contentContainerStyle={filteredFriends.length === 0 ? styles.emptyListContainer : styles.listContainer}
                 />
             )}
         </View>
@@ -179,12 +227,12 @@ const FriendListScreen = ({ userId }: { userId: string }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#ffffff',
     },
     headerContainer: {
         padding: 10,
         backgroundColor: '#fff',
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#e0e0e0',
     },
     searchBar: {
@@ -194,12 +242,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0,
     },
     searchInput: {
-        fontSize: 14,
+        fontSize: 16,
     },
-    friendRequestLink: {
+    friendRequestButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         padding: 16,
         backgroundColor: '#fff',
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#e0e0e0',
     },
     friendRequestText: {
@@ -207,35 +258,71 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
     },
+    friendRequestBadge: {
+        backgroundColor: '#EA4335',
+        borderRadius: 10,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    friendRequestBadgeText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     itemContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
+        padding: 12,
         backgroundColor: '#fff',
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#e0e0e0',
     },
     userInfoContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
-        marginRight: 10,
     },
-    callButtonsContainer: {
-        flexDirection: 'row',
+    avatarContainer: {
+        position: 'relative',
+        marginRight: 12,
     },
     avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        marginRight: 12,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: '#e0e0e0',
+    },
+    statusIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    textContainer: {
+        flex: 1,
     },
     itemText: {
         fontSize: 16,
         color: '#202124',
-        flexShrink: 1,
+        fontWeight: '500',
+    },
+    lastSeenText: {
+        fontSize: 12,
+        color: '#9E9E9E',
+        marginTop: 2,
+    },
+    callButtonsContainer: {
+        flexDirection: 'row',
+    },
+    callButton: {
+        margin: 0,
     },
     loader: {
         marginTop: 20,
@@ -253,6 +340,10 @@ const styles = StyleSheet.create({
     emptyListContainer: {
         flex: 1,
     },
+    listContainer: {
+        paddingBottom: 16,
+    },
 });
+
 
 export default FriendListScreen;

@@ -1,11 +1,11 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator } from 'react-native-paper';
+import { ActivityIndicator, Searchbar } from 'react-native-paper';
 import { FlatList, View, Text, TouchableOpacity, Image, RefreshControl, StyleSheet } from 'react-native';
-import { Searchbar } from 'react-native-paper';
 import { useQuery } from 'react-query';
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { conversationAPI } from '@/api/conversation.api';
+import { userAPI } from '@/api/user.api';
 import { router } from 'expo-router';
 import moment from 'moment';
 import 'moment/locale/vi';
@@ -23,7 +23,8 @@ interface ConversationWithLastMessage {
         content: string;
         createAt: Date;
     };
-    name?: string; // Added for participant names
+    name?: string;
+    avatar?: string;
 }
 
 const ConversationListScreen = () => {
@@ -55,11 +56,48 @@ const ConversationListScreen = () => {
         { enabled: !!currentUserId }
     );
 
+    const getParticipantInfo = async (participantIds: number[], currentUserId: number) => {
+        try {
+            // Filter out the current user and get unique participants
+            const uniqueParticipants = [...new Set(participantIds.filter(id => id !== currentUserId))];
+
+            // If it's a one-on-one chat, get the other participant's info
+            if (uniqueParticipants.length === 1) {
+                const response = await userAPI.getUserProfile(uniqueParticipants[0]);
+                const fullName = `${response.data.first_name} ${response.data.last_name}`.trim();
+                return {
+                    name: fullName,
+                    avatar: response.data.avatar
+                };
+            }
+
+            // If it's a group chat, return all unique participant names
+            const participantResponses = await Promise.all(
+                uniqueParticipants.map(id => userAPI.getUserProfile(id))
+            );
+
+            const participantNames = participantResponses.map(res =>
+                `${res.data.first_name} ${res.data.last_name}`.trim()
+            );
+
+            return {
+                name: participantNames.join(', '),
+                avatar: undefined
+            };
+        } catch (error) {
+            console.error('Error fetching participant info:', error);
+            return {
+                name: 'Unknown User',
+                avatar: undefined
+            };
+        }
+    };
+
     // Fetch last message and participant names for each conversation
     useEffect(() => {
         const fetchConversationDetails = async () => {
-            if (!conversationsData || !Array.isArray(conversationsData)) {
-                console.warn('No valid conversations data');
+            if (!conversationsData || !Array.isArray(conversationsData) || !currentUserId) {
+                console.warn('No valid conversations data or user ID');
                 setEnrichedConversations([]);
                 return;
             }
@@ -78,14 +116,12 @@ const ConversationListScreen = () => {
                             )
                             : undefined;
 
-                        // Get participant names (you'll need to implement this API)
-                        // const participantNames = await getParticipantNames(conv.participants);
-                        // For now, we'll use a placeholder
-                        const participantNames = ['User 1', 'User 2']; // Replace with actual API call
+                        const participantInfo = await getParticipantInfo(conv.participants, currentUserId);
 
                         return {
                             conversation: conv,
-                            name: participantNames.join(', '),
+                            name: participantInfo.name,
+                            avatar: participantInfo.avatar,
                             lastMessage: lastMessage ? {
                                 content: lastMessage.content,
                                 createAt: lastMessage.createAt
@@ -119,8 +155,7 @@ const ConversationListScreen = () => {
     const filteredConversations = enrichedConversations.filter(({ conversation, name }) => {
         const searchLower = searchQuery.toLowerCase();
         return (
-            name?.toLowerCase().includes(searchLower) ||
-            conversation.id.toString().toLowerCase().includes(searchLower)
+            name?.toLowerCase().includes(searchLower)
         );
     });
 
@@ -155,12 +190,13 @@ const ConversationListScreen = () => {
                                     pathname: '/(chatbox)',
                                     params: {
                                         conversationId: item.conversation.id,
-                                        name: item.name
+                                        name: item.name,
+                                        avatar: item.avatar
                                     }
                                 })}
                             >
                                 <Image
-                                    source={require('@/assets/images/default-avatar.png')}
+                                    source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
                                     style={styles.avatar}
                                 />
                                 <View style={styles.conversationContent}>

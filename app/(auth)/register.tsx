@@ -24,7 +24,7 @@ export default function RegisterScreen() {
 
     const register = useMutation(authAPI.register, {
         onSuccess: (response) => {
-            setErrorText("Đăng ký thành công! Vui lòng đăng nhập.");
+            setErrorText("Registration successful! Please login.");
             setErrorVisible(true);
             // Clear form
             setRegisterInfo({
@@ -40,10 +40,10 @@ export default function RegisterScreen() {
             setTimeout(() => router.navigate("/login"), 2000);
         },
         onError: (error: any) => {
-            const errorMessage = error.response?.data?.message || "Đăng ký thất bại";
+            const errorMessage = error.response?.data?.message || "Registration failed";
             setErrorText(
                 errorMessage.includes("already exists")
-                    ? "Tài khoản hoặc email đã tồn tại!"
+                    ? "Account or email already exists!"
                     : errorMessage
             );
             setErrorVisible(true);
@@ -55,25 +55,25 @@ export default function RegisterScreen() {
 
         if (!registerInfo.username || !registerInfo.email || !registerInfo.password ||
             !registerInfo.phone || !registerInfo.first_name || !registerInfo.last_name) {
-            setErrorText("Vui lòng điền đầy đủ thông tin!");
+            setErrorText("Please fill in all information!");
             setErrorVisible(true);
             return;
         }
 
         if (!/^\S+@\S+\.\S+$/.test(registerInfo.email)) {
-            setErrorText("Email không hợp lệ!");
+            setErrorText("Invalid email!");
             setErrorVisible(true);
             return;
         }
 
         if (registerInfo.phone.length < 10) {
-            setErrorText("Số điện thoại không hợp lệ!");
+            setErrorText("Invalid phone number!");
             setErrorVisible(true);
             return;
         }
 
         if (registerInfo.password.length < 6) {
-            setErrorText("Mật khẩu phải có ít nhất 6 ký tự!");
+            setErrorText("Password must be at least 6 characters!");
             setErrorVisible(true);
             return;
         }
@@ -84,7 +84,7 @@ export default function RegisterScreen() {
     const checkIdenticalConfirmedPass = (password: string) => {
         setConfirmPassword(password);
         if (password !== registerInfo.password) {
-            setErrorText("Mật khẩu không trùng khớp!");
+            setErrorText("Passwords do not match!");
             setErrorVisible(true);
         } else {
             setErrorText("");
@@ -110,13 +110,13 @@ export default function RegisterScreen() {
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>Đăng ký ZChat</Text>
+                <Text style={styles.title}>Register ZChat</Text>
 
                 <View style={styles.formContainer}>
                     <TextInput
                         mode="outlined"
-                        label="Tên đăng nhập"
-                        placeholder="Nhập tên đăng nhập"
+                        label="Username"
+                        placeholder="Username"
                         value={registerInfo.username}
                         onChangeText={(value) => onFormChangeHandler("username", value)}
                         autoCapitalize="none"
@@ -125,7 +125,7 @@ export default function RegisterScreen() {
                     <TextInput
                         mode="outlined"
                         label="Email"
-                        placeholder="Nhập email"
+                        placeholder="Email"
                         value={registerInfo.email}
                         onChangeText={(value) => onFormChangeHandler("email", value)}
                         keyboardType="email-address"
@@ -134,24 +134,24 @@ export default function RegisterScreen() {
                     />
                     <TextInput
                         mode="outlined"
-                        label="Họ"
-                        placeholder="Nhập họ"
+                        label="First Name"
+                        placeholder="First Name"
                         value={registerInfo.first_name}
                         onChangeText={(value) => onFormChangeHandler("first_name", value)}
                         theme={{ colors: { primary: '#4FC3F7' } }}
                     />
                     <TextInput
                         mode="outlined"
-                        label="Tên"
-                        placeholder="Nhập tên"
+                        label="Last Name"
+                        placeholder="Last Name"
                         value={registerInfo.last_name}
                         onChangeText={(value) => onFormChangeHandler("last_name", value)}
                         theme={{ colors: { primary: '#4FC3F7' } }}
                     />
                     <TextInput
                         mode="outlined"
-                        label="Số điện thoại"
-                        placeholder="Nhập số điện thoại"
+                        label="Phone"
+                        placeholder="Phone"
                         value={registerInfo.phone}
                         onChangeText={handleChangePhone}
                         keyboardType="phone-pad"
@@ -159,8 +159,8 @@ export default function RegisterScreen() {
                     />
                     <TextInput
                         mode="outlined"
-                        label="Mật khẩu"
-                        placeholder="Nhập mật khẩu"
+                        label="Password"
+                        placeholder="Password"
                         secureTextEntry={true}
                         value={registerInfo.password}
                         onChangeText={(value) => onFormChangeHandler("password", value)}
@@ -168,15 +168,15 @@ export default function RegisterScreen() {
                     />
                     <TextInput
                         mode="outlined"
-                        label="Xác nhận mật khẩu"
-                        placeholder="Nhập lại mật khẩu"
+                        label="Confirm Password"
+                        placeholder="Confirm Password"
                         secureTextEntry={true}
                         value={confirmPassword}
                         onChangeText={checkIdenticalConfirmedPass}
                         theme={{ colors: { primary: '#4FC3F7' } }}
                     />
                     {errorVisible && (
-                        <ThemedText type={errorText.includes("thành công") ? "default" : "error"}>
+                        <ThemedText type={errorText.includes("successful") ? "default" : "error"}>
                             {errorText}
                         </ThemedText>
                     )}
@@ -187,10 +187,10 @@ export default function RegisterScreen() {
                         loading={register.isLoading}
                         disabled={register.isLoading}
                     >
-                        ĐĂNG KÝ
+                        REGISTER
                     </Button>
                     <Link href="/login" style={styles.loginLink}>
-                        Đã có tài khoản? Đăng nhập
+                        Already have an account? Sign in
                     </Link>
                 </View>
             </ScrollView>

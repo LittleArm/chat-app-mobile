@@ -14,7 +14,7 @@ export default function AuthRootScreen() {
                     labelStyle={styles.loginButtonLabel}
                     onPress={() => router.navigate("./login")}
                 >
-                    ĐĂNG NHẬP
+                    LOGIN
                 </Button>
 
                 <Button
@@ -23,7 +23,7 @@ export default function AuthRootScreen() {
                     labelStyle={styles.registerButtonLabel}
                     onPress={() => router.navigate("./register")}
                 >
-                    ĐĂNG KÝ
+                    REGISTER
                 </Button>
             </View>
         </View>

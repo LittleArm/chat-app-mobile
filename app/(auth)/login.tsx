@@ -34,7 +34,7 @@ export default function LoginScreen() {
             }
         },
         onError: (error: any) => {
-            setError(error.response?.data?.message || "Tài khoản hoặc mật khẩu không đúng!");
+            setError(error.response?.data?.message || "Phone or password is not correct!");
         },
     });
 
@@ -47,19 +47,19 @@ export default function LoginScreen() {
         event.preventDefault();
 
         if (!loginInfo.phone || !loginInfo.password) {
-            setErrorText("Vui lòng nhập số điện thoại và mật khẩu!");
+            setErrorText("Please enter phone number and password!");
             setErrorVisible(true);
             return;
         }
 
         if (loginInfo.phone.length < 10) {
-            setErrorText("Số điện thoại không hợp lệ!");
+            setErrorText("Invalid phone number!");
             setErrorVisible(true);
             return;
         }
 
         if (loginInfo.password.length < 6) {
-            setErrorText("Mật khẩu phải có ít nhất 6 ký tự!");
+            setErrorText("Password must be at least 6 characters!");
             setErrorVisible(true);
             return;
         }
@@ -80,21 +80,21 @@ export default function LoginScreen() {
 
     return (    
         <View style={styles.container}>
-            <Text style={styles.title}>Đăng nhập ZChat</Text>
+            <Text style={styles.title}>Login ZChat</Text>
       
             <View style={styles.formContainer}>
                 <TextInput
                     mode="outlined"
-                    label="Số điện thoại"
-                    placeholder="Nhập số điện thoại"
+                    label="Phone"
+                    placeholder="Phone"
                     value={loginInfo.phone}
                     onChangeText={handleChangePhone}
                     theme={{ colors: { primary: '#4FC3F7' } }}
                 />
                 <TextInput
                     mode="outlined"
-                    label="Mật khẩu"
-                    placeholder="Nhập mật khẩu"
+                    label="Password"
+                    placeholder="Password"
                     secureTextEntry={true}
                     value={loginInfo.password}
                     style={{ marginBottom: 10 }}
@@ -110,11 +110,11 @@ export default function LoginScreen() {
                     onPress={handleSubmit}
                     loading={isLoading}
                 >
-                    ĐĂNG NHẬP
+                    LOGIN
                 </Button>
         
                 <Link href="/register" style={styles.registerLink}>
-                    Đăng ký mới
+                    Register
                 </Link>
             </View>
         </View>
