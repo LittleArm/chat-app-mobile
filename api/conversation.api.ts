@@ -1,6 +1,7 @@
 import http from "../utils/http";
 import { MessageResponse } from "../types/api/response/message.response";
 import { ConversationByUserResult } from "../types/api/response/conversation";
+import { User_Info_Response } from "../types/api/response/user_info.response";       
 
 export const CONVERSATION_URL = {
     LIST_CONVERSATIONS: "/conversations/:userId",
@@ -9,6 +10,7 @@ export const CONVERSATION_URL = {
     JOIN_CONVERSATION: "/ws/joinConversation/:conversationId",
     //GET_CONVERSATIONS: "/ws/getConversations",
     GET_CLIENTS: "/ws/getClients/:conversationId",
+    GET_USER_INFO_CHAT: "/user/:userId",
 };
 
 export const conversationAPI = {
@@ -36,5 +38,10 @@ export const conversationAPI = {
 
     getClients(conversationId: number) {
         return http.get<{ clients: any[] }>(CONVERSATION_URL.GET_CLIENTS.replace(":conversationId", conversationId.toString()));
+    },
+
+    // api/conversation.api.ts
+    getUserInfo_chatbox(userId: number) {
+        return http.get<User_Info_Response>(CONVERSATION_URL.GET_USER_INFO_CHAT.replace(":userId", userId.toString()));
     }
 };

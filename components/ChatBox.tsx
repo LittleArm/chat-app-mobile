@@ -1,12 +1,11 @@
-// import * as DocumentPicker from 'expo-document-picker';
 import { useChat } from "@/contexts/ChatContext";
-import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect } from "expo-router";
 import React, {
   FC,
   memo,
   useCallback,
   useEffect,
+  useRef,
   useMemo,
   useState,
 } from "react";
@@ -18,39 +17,113 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import EmojiSelector from "react-native-emoji-selector";
 import { Bubble, GiftedChat, IMessage } from "react-native-gifted-chat";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { FontAwesome } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMutation, useQuery, useQueryClient } from "react-query";
-import { chatAPI } from "@/api/chat.api";
 import { useToast } from "react-native-paper-toast";
-import { ChatLogContentTypeCode } from "@/utils/enums";
-import { groupAPI } from "@/api/group.api";
-import { userAPI } from "@/api/user.api";
-import messaging from "@react-native-firebase/messaging";
+import { useLocalSearchParams } from 'expo-router';
+import { conversationAPI } from "@/api/conversation.api";
+import { User_Info_Response } from "@/types/api/response/user_info.response";
+import { MessageResponse } from "@/types/api/response/message.response";
 
 interface ChatInputProps {
   reset?: number;
   onSubmit?: (text: string) => void;
+  setMessages: React.Dispatch<React.SetStateAction<IMessage[]>>;
 }
-
-const ChatInput: FC<ChatInputProps> = (props) => {
+const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
+// const ChatInput: FC<ChatInputProps> = (props) => {
+  const { userId } = useAuth();
+  const params = useLocalSearchParams();
+  const [userInfo, setUserInfo] = useState<User_Info_Response | null>(null);
   const [inputMessage, setInputMessage] = useState("");
+
+  // Fetch user info when component mounts
+//   useEffect(() => {
+//     const fetchUserInfo = async () => {
+//       try {
+//         const userData = await conversationAPI.getUserInfo_chatbox(Number(userId));
+//         setUserInfo(userData.data);
+//       } catch (error) {
+//         console.error("Failed to fetch user info:", error);
+//         // Set default values if fetch fails
+//         setUserInfo({
+//           id: userId.toString(),
+//           username: "User",
+//           email: "",
+//           phone: "",
+//           first_name: "",
+//           last_name: "",
+//           avatar: "",
+//           created_at: new Date().toISOString(),
+//           updated_at: new Date().toISOString()
+//         });
+//       }
+//     };
+
+//     if (userId) {
+//       fetchUserInfo();
+//     }
+//   }, [userId]);
+
+//   const username = userInfo?.username || "Unknown";
+  const conversationId = params.conversationId?.toString() || "";
+  const ws = useRef<WebSocket | null>(null); 
+
+  useEffect(() => {
+    const socketUrl = `ws://192.168.1.117:5050/ws/joinConversation/${conversationId}?userId=${userId}&username=test1`;
+    ws.current = new WebSocket(socketUrl);
+
+    ws.current.onopen = () => {
+      console.log("WebSocket connected ✅ at: ", socketUrl);
+    };
+
+    return () => {
+      ws.current?.close();
+    };
+  }, [conversationId, userId, 'test1']);
 
   useEffect(() => {
     setInputMessage("");
-  }, [props.reset]);
+  }, [reset]);
+
   const handleInputText = (text: string) => {
     setInputMessage(text);
   };
 
   const handleOnPressSendButton = () => {
-    if (props.onSubmit) {
-      props.onSubmit(inputMessage);
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.warn("WebSocket not open.");
+      return;
     }
+  
+    if (inputMessage.trim() === "") {
+      return;
+    }
+  
+    // Create a temporary message object
+    const tempMessage = {
+      _id: Math.round(Math.random() * 1000000).toString(), // Temporary ID
+      text: inputMessage,
+      createdAt: new Date(),
+      user: {
+        _id: userId, // Replace with your current user's ID
+      },
+      // You might want to add a 'pending' flag if you need to track unsent messages
+    };
+  
+    // Optimistically update the UI
+    setMessages(previousMessages => GiftedChat.append(previousMessages, [tempMessage]));
+    
+    console.log("Sending message:", inputMessage);
+    ws.current.send(inputMessage);
+    setInputMessage("");
+  
+    // If your WebSocket sends back confirmation, you might update the temporary message
+    // with the actual server data when received
   };
 
   return (
@@ -78,215 +151,58 @@ const ChatInput: FC<ChatInputProps> = (props) => {
 
 interface ChatBoxProps {
   name?: string;
-  toUserId?: string;
-  toGroupId?: string;
   chatboxId: string;
   avatar?: string;
-  isGroupChat: boolean;
   onSetting?: () => void;
 }
 
 const ChatBoxComponent = ({
   name,
-  toUserId,
-  toGroupId,
   chatboxId,
   avatar,
-  isGroupChat,
   onSetting,
 }: ChatBoxProps) => {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<IMessage[]>([]);
   const [resetChatInput, setResetChatInput] = useState(0);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const { userId } = useAuth();
-  const toaster = useToast();
-  const queryClient = useQueryClient();
-  const [chatBoxProfile, setChatBoxProfile] = useState({
-    name: "",
-    avatar: "",
-  });
+  const params = useLocalSearchParams();
+  const conversationId = params.conversationId?.toString() || "";
 
-  const { isLoading, data, refetch } = useQuery({
-    queryKey: ["ChatDetail", toUserId, toGroupId, chatboxId],
-    queryFn: () =>
-      chatAPI.chatDetail({
-        chat_box_id: chatboxId,
-        to_group: toGroupId,
-        to_user: toUserId,
-      }),
-    select: (rs) => {
-      if (rs.data && genMessages) {
-        genMessages(rs.data);
-      }
-      return rs.data;
-    },
-    enabled: false,
-  });
-
-  const insertChatLog = useMutation(chatAPI.insertChatlog, {
-    onSuccess: (response) => {
-      const { id, content, owner_id, created_date } = response.data;
-
-      if (id) {
-        const iMessage: IMessage = {
-          _id: id,
-          text: content,
-          createdAt: created_date,
-          user: {
-            _id: owner_id,
-          },
+    useEffect(() => {
+        const fetchChatHistory = async () => {
+            try {
+                const response = await conversationAPI.chatDetail(Number(conversationId));
+                const formattedMessages = response.map((msg) => ({
+                    _id: `${msg.convesationId}-${msg.senderId}-${new Date(msg.createAt).getTime()}`,
+                    text: msg.content,
+                    createdAt: new Date(msg.createAt),
+                    user: {
+                        _id: msg.senderId.toString(),
+                    }
+                })).reverse();
+                
+                setMessages(formattedMessages);
+            } catch (error) {
+                console.error("Failed to fetch chat history:", error);
+            }
         };
-        setMessages((prev) => [iMessage, ...prev]);
-        queryClient.invalidateQueries(["GetChatBoxListByUser"]);
-      }
-    },
-    onError: (error: any) => {
-      toaster.show({
-        message: error,
-        duration: 2000,
-        type: "error",
-      });
-    },
-  });
 
-  const { refetch: refetchGroupInfo } = useQuery({
-    queryKey: ["GetGroupInfo"],
-    queryFn: () => groupAPI.get(toGroupId),
-    enabled: false,
-    select: (rs) => {
-      if (rs.data && setProfile) {
-        const { name, avatar } = rs.data;
-        setProfile({ name, avatar });
-      }
-      return rs.data;
-    },
-  });
+        // Initial fetch
+        fetchChatHistory();
 
-  const { refetch: refetchUserInfo } = useQuery({
-    queryKey: ["GetUserInfo"],
-    queryFn: () => userAPI.getUserProfile(toUserId),
-    enabled: false,
-    select: (rs) => {
-      if (rs.data && setProfile) {
-        const { fullname, avatar } = rs.data[0];
-        setProfile({ name: fullname, avatar });
-      }
-      return rs.data;
-    },
-  });
+        // Set up interval for periodic fetching
+        const intervalId = setInterval(fetchChatHistory, 1000);
 
-  useEffect(() => {
-    refetch();
-    messaging().onMessage(async (remoteMessage) => {
-      console.log(
-        "A new FCM message arrived!",
-        JSON.stringify(remoteMessage)
-      );
-      refetch();
-    });
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (isGroupChat) {
-        refetchGroupInfo();
-      } else {
-        refetchUserInfo();
-      }
-    }, [])
-  );
-
-  const setProfile = (groupProfile: { name: string; avatar: string }) => {
-    setChatBoxProfile({ ...groupProfile });
-  };
-
-  const genMessages = (data) => {
-    if (data) {
-      const iMessages: IMessage[] = [];
-      for (let i = data.length - 1; i >= 0; i--) {
-        const item = data[i];
-        const iMessage: IMessage = {
-          _id: item.id,
-          text: item.chat_log.content,
-          createdAt: item.chat_log.created_date,
-          user: {
-            _id: item.chat_log.owner_id,
-          },
-        };
-        iMessages.push(iMessage);
-      }
-      setMessages([...iMessages]);
-      return iMessages;
-    }
-  };
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      alert("Permission to access media library is required!");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const imageUri = result.assets[0].uri;
-      const newMessage = {
-        _id: Date.now(),
-        text: "",
-        createdAt: new Date(),
-        user: { _id: 1, name: "Bạn" },
-        image: imageUri,
-      };
-      setMessages((prevMessages) =>
-        GiftedChat.append(prevMessages, [newMessage])
-      );
-    }
-  };
-
-  const attachFile = async () => {
-    try {
-      // const result: any = await DocumentPicker.getDocumentAsync({
-      //   type: '*/*', // You can specify MIME types like "image/*", "application/pdf", etc.
-      // });
-      // if (result.type === 'success') {
-      //   console.log('Selected File:', result);
-      // } else {
-      //   console.log('User canceled file picker');
-      // }
-    } catch (error) {
-      console.error("Error picking document:", error);
-    }
-  };
-
-  const handleTextEmoji = (emoji: string) => {
-    const textMessage = {
-      _id: Date.now(),
-      text: emoji,
-      createdAt: new Date(),
-      user: { _id: 1 },
-    };
-    setMessages((prevMessages) =>
-      GiftedChat.append(prevMessages, [textMessage])
-    );
-    setShowEmojiPicker(false);
-  };
+        // Clean up interval on component unmount
+        return () => clearInterval(intervalId);
+    }, [conversationId]); 
 
   const renderMessage = (props) => {
     const { currentMessage } = props;
 
     if (currentMessage.user._id === userId) {
       return (
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            justifyContent: "flex-end",
-          }}
-        >
+        <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end" }}>
           <Bubble
             {...props}
             wrapperStyle={{
@@ -306,13 +222,7 @@ const ChatBoxComponent = ({
       );
     } else {
       return (
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            justifyContent: "flex-start",
-          }}
-        >
+        <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-start" }}>
           <Bubble
             {...props}
             wrapperStyle={{
@@ -332,62 +242,31 @@ const ChatBoxComponent = ({
     }
   };
 
-  const submitHandler = (text: string) => {
-    if (!text.trim()) {
-      return;
-    }
-    setResetChatInput((prev) => prev + 1);
-    const toId = isGroupChat ? toGroupId : toUserId;
-    insertChatLog.mutate({
-      to_id: toId,
-      is_group_chat: isGroupChat,
-      content: text.trim(),
-      content_type_code: ChatLogContentTypeCode.TEXT,
-      created_date: new Date(),
-    });
-  };
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 16,
-          backgroundColor: "#fff",
-          borderBottomColor: "gray",
-          borderBottomWidth: 0.2,
-        }}
-      >
+      <View style={styles.header}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <TouchableOpacity
-            onPress={() => {
-              router.back();
-            }}
+            onPress={() => router.back()}
             style={{ marginRight: 18 }}
           >
             <FontAwesome name="arrow-left" size={22} color={"gray"} />
           </TouchableOpacity>
           <View>
             <Image
-              source={{
-                uri: `data:image/png;base64, ${chatBoxProfile.avatar}`,
-              }}
+              source={{ uri: avatar ? `data:image/png;base64, ${avatar}` : "" }}
               style={styles.avatar}
             />
           </View>
           <View style={{ marginLeft: 16 }}>
-            <Text style={styles.headerText}>{chatBoxProfile.name}</Text>
+            <Text style={styles.headerText}>{name}</Text>
           </View>
         </View>
 
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => {
-              if (onSetting) onSetting();
-            }}
+            onPress={onSetting}
           >
             <Icon name="settings" size={24} color="#888" />
           </TouchableOpacity>
@@ -396,15 +275,12 @@ const ChatBoxComponent = ({
 
       <GiftedChat
         messages={messages}
-        renderInputToolbar={() => {
-          return null;
-        }}
+        renderInputToolbar={() => null}
         user={{ _id: userId }}
         minInputToolbarHeight={0}
-        renderMessage={(props) => renderMessage(props)}
-      ></GiftedChat>
-
-      <ChatInput reset={resetChatInput} onSubmit={submitHandler} />
+        renderMessage={renderMessage}
+      />
+      <ChatInput reset={resetChatInput} setMessages={setMessages} />
     </SafeAreaView>
   );
 };
@@ -421,11 +297,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 10,
     elevation: 5,
-  },
-  backButton: {
-    height: 24,
-    width: 24,
-    tintColor: "black",
+    borderBottomColor: "gray",
+    borderBottomWidth: 0.2,
   },
   avatar: {
     height: 49,
@@ -437,27 +310,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  headerIcons: {
-    flexDirection: "row",
-  },
   iconButton: {
     marginHorizontal: 5,
     padding: 8,
     backgroundColor: "#fff",
     borderRadius: 50,
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 5,
-    paddingVertical: 5,
-  },
-  actionButton: {
-    marginHorizontal: 5,
-    padding: 8,
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    elevation: 2,
   },
   inputContainer: {
     backgroundColor: "#fff",
