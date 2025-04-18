@@ -9,9 +9,6 @@ export default function AppSplashScreen() {
     const checkAccessToken = async () => {
         const access_token = await AsyncStorage.getItem(STORAGE_KEY.ACCESS_TOKEN);    
         if (access_token) {
-            //// for testing
-            //await AsyncStorage.removeItem(STORAGE_KEY.ACCESS_TOKEN);
-            //router.push("/(auth)");
             router.push("/(tabs)");
         } else {
             router.push("/(auth)");
