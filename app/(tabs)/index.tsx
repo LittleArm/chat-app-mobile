@@ -69,26 +69,31 @@ const ConversationListScreen = () => {
         { enabled: !!currentUserId }
     );
 
-    // Fetch friends list
+    // Fetch friends list - remove the enabled condition
     const { data: friends, refetch: refetchFriends } = useQuery({
         queryKey: ["friends", currentUserId],
-        queryFn: () => {
-            return friendAPI.getFriends(currentUserId);
-        },
+        queryFn: () => friendAPI.getFriends(currentUserId),
         select: (response) => response.data,
-        enabled: !!currentUserId,
+        enabled: !!currentUserId, // Only enable if we have currentUserId
     });
 
     // Mark friends with existing conversations
     useEffect(() => {
-        if (friends && conversationsData) {
-            const updatedFriends = friends.map(friend => {
-                const hasExistingConversation = conversationsData.some(conv => 
-                    conv.participants.includes(friend.id) && 
-                    conv.type === 'direct'
-                );
-                return { ...friend, hasExistingConversation };
-            });
+        if (friends) {
+            // Always set friends first
+            let updatedFriends = [...friends];
+            
+            // Then enhance with conversation info if available
+            if (conversationsData) {
+                updatedFriends = updatedFriends.map(friend => {
+                    const hasExistingConversation = conversationsData.some(conv => 
+                        conv.participants.includes(friend.id) && 
+                        conv.type === 'private'
+                    );
+                    return { ...friend, hasExistingConversation };
+                });
+            }
+            
             setFilteredFriends(updatedFriends);
         }
     }, [friends, conversationsData]);
@@ -391,6 +396,7 @@ const ConversationListScreen = () => {
                 onPress={() => {
                     setSelectedFriends([]);
                     setIsPopupVisible(true);
+                    refetchFriends(); // Force refresh friends list when opening
                 }}
             >
                 <Text style={styles.buttonText}>+</Text>
