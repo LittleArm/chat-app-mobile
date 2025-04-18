@@ -25,7 +25,7 @@ export const conversationAPI = {
         ).then(response => response.data.messages);
     },
     createConversation(conversationData: any) {
-        return http.post<{ message: string }>(CONVERSATION_URL.CREATE_CONVERSATION, conversationData);
+        return http.post<{ id: string | number }>(CONVERSATION_URL.CREATE_CONVERSATION, conversationData);
     },
 
     joinConversation(conversationId: number) {

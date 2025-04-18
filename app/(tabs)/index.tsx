@@ -259,7 +259,6 @@ const ConversationListScreen = () => {
                     }
                 });
             } else {
-                // For group chats, you might want to handle naming differently
                 router.push({
                     pathname: '/(chatbox)',
                     params: {
@@ -278,7 +277,7 @@ const ConversationListScreen = () => {
             
         } catch (error) {
             console.error('Error creating conversation:', error);
-            // You might want to show an error message to the user here
+
         }
     }, [selectedFriends, filteredFriends, enrichedConversations, currentUserId, refetch]);
 
