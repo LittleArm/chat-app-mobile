@@ -10,6 +10,7 @@ export const FRIEND_URL = {
     SENT_FRIEND_REQUESTS: "/sentFriendRequests/:userId",
     RECEIVED_FRIEND_REQUESTS: "/receivedFriendRequests/:friendId",
     GET_FRIENDS: "/friends/:userId",
+    FIND_USERS: "/findUsers",
 };
 
 export const friendAPI = {
@@ -33,5 +34,10 @@ export const friendAPI = {
     },
     getFriends(userId: number) {
         return http.get<FriendResponse[]>(FRIEND_URL.GET_FRIENDS.replace(":userId", userId.toString()));
+    },
+    findUsers(search: string) {
+        return http.get<{ users: FriendResponse[] }>(FRIEND_URL.FIND_USERS, {
+            params: { search }
+        });
     }
 };

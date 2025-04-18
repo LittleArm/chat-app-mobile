@@ -9,8 +9,9 @@ import {
     TouchableOpacity,
     View,
     RefreshControl,
+    Modal,
 } from "react-native";
-import { ActivityIndicator, IconButton, Searchbar } from "react-native-paper";
+import { ActivityIndicator, IconButton, Searchbar, Button } from "react-native-paper";
 import { useQuery } from "react-query";
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -105,6 +106,24 @@ const FriendListScreen = () => {
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = React.useState("");
     const [isRefreshing, setIsRefreshing] = React.useState(false);
+    const [isAddFriendModalVisible, setIsAddFriendModalVisible] = React.useState(false);
+    const [phoneSearch, setPhoneSearch] = useState('');
+
+    interface FriendResponse {
+        id: number;
+        username: string;
+        email: string;
+        phone: string;
+        first_name: string;
+        last_name: string;
+        avatar: string | null;
+        created_at: string;
+        updated_at: string;
+    }
+
+    const [searchResults, setSearchResults] = useState<FriendResponse[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [requestSent, setRequestSent] = useState<Record<number, boolean>>({});
 
     // Load user ID
     useEffect(() => {
@@ -153,6 +172,65 @@ const FriendListScreen = () => {
     const handleSearch = useCallback((text: string) => {
         setSearchQuery(text);
     }, []);
+
+    const onSubmitEditing = useCallback(async () => {
+        if (phoneSearch.trim() && currentUserId) {
+            setIsSearching(true);
+            try {
+                console.log('Starting search with phone:', phoneSearch);
+                
+                // First, refresh the friends list to ensure we have the latest data
+                const friendsResponse = await refetch();
+                const currentFriends = friendsResponse.data || [];
+                console.log('Current friends:', currentFriends.map(f => f.id));
+                
+                // Then perform the search
+                const response = await friendAPI.findUsers(phoneSearch);
+                console.log('Search results:', response.data.users.map(u => u.id));
+                
+                // Convert currentUserId to string for consistent comparison
+                const currentUserIdStr = String(currentUserId);
+                
+                // Filter out unwanted results with proper type comparison
+                const filteredResults = response.data.users.filter(user => {
+                    const userIdStr = String(user.id);
+                    const isCurrentUser = userIdStr === currentUserIdStr;
+                    const isExistingFriend = currentFriends.some(friend => 
+                        String(friend.id) === userIdStr
+                    );
+                    
+                    console.log(`User ${userIdStr}:`, {
+                        isCurrentUser,
+                        isExistingFriend,
+                        shouldInclude: !isCurrentUser && !isExistingFriend,
+                    });
+                    
+                    return !isCurrentUser && !isExistingFriend;
+                });
+    
+                console.log('Filtered results:', filteredResults.map(u => u.id));
+                
+                setSearchResults(filteredResults.map(user => ({
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    phone: user.phone,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    avatar: user.avatar || null,
+                    created_at: user.CreateAt ? user.CreateAt.toISOString() : '',
+                    updated_at: user.UpdatedAt ? user.UpdatedAt.toISOString() : '',
+                })));
+            } catch (error) {
+                console.error('Search error:', error);
+                setSearchResults([]);
+            } finally {
+                setIsSearching(false);
+            }
+        } else {
+            setSearchResults([]);
+        }
+    }, [phoneSearch, currentUserId, refetch]);
 
     const handleCallPress = useCallback((type: "audio" | "video") => {
         console.log(`Initiating ${type} call`);
@@ -225,6 +303,108 @@ const FriendListScreen = () => {
                     contentContainerStyle={filteredFriends.length === 0 ? styles.emptyListContainer : styles.listContainer}
                 />
             )}
+
+            {/* Floating Add Friend Button */}
+            <TouchableOpacity 
+                style={styles.floatingButton}
+                onPress={() => setIsAddFriendModalVisible(true)}
+            >
+                <Text style={styles.floatingButtonText}>+</Text>
+            </TouchableOpacity>
+
+            {/* Add Friend Modal */}
+            <Modal
+                transparent={true}
+                visible={isAddFriendModalVisible}
+                onRequestClose={() => {
+                    setIsAddFriendModalVisible(false);
+                    setPhoneSearch('');
+                    setSearchResults([]);
+                }}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <Text style={styles.modalTitle}>Add New Friends</Text>
+                        
+                        <Searchbar
+                            placeholder="Search by phone number"
+                            onChangeText={setPhoneSearch}
+                            value={phoneSearch}
+                            style={styles.modalSearchBar}
+                            onSubmitEditing={onSubmitEditing}  // Updated to use the new callback
+                        />
+
+                        {isSearching ? (
+                            <ActivityIndicator style={styles.modalLoader} size="small" color="#4285F4" />
+                        ) : (
+                            <FlatList
+                                data={searchResults}
+                                keyExtractor={(item) => item.id.toString()}
+                                renderItem={({ item }) => (
+                                    <View style={styles.searchResultItem}>
+                                        <Image
+                                            source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
+                                            style={styles.searchResultAvatar}
+                                        />
+                                        <View style={styles.searchResultText}>
+                                            <Text style={styles.searchResultName}>{item.first_name} {item.last_name}</Text>
+                                            <Text style={styles.searchResultPhone}>{item.phone}</Text>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.addButton,
+                                                requestSent[item.id] && styles.addButtonSent
+                                            ]}
+                                            onPress={async () => {
+                                                if (currentUserId && !requestSent[item.id]) {
+                                                    try {
+                                                        await friendAPI.addFriend(currentUserId, item.id);
+                                                        setRequestSent(prev => ({
+                                                            ...prev,
+                                                            [item.id]: true
+                                                        }));
+                                                    } catch (error) {
+                                                        console.error('Error sending request:', error);
+                                                    }
+                                                }
+                                            }}
+                                            disabled={requestSent[item.id]}
+                                        >
+                                            <Text style={styles.addButtonText}>
+                                                {requestSent[item.id] ? 'Request Sent' : 'Add Friend'}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                                ListEmptyComponent={
+                                    phoneSearch ? (
+                                        <Text style={styles.noResultsText}>
+                                            {searchResults.length === 0 && !isSearching 
+                                                ? "No users found or user is already your friend" 
+                                                : "No users found with this phone number"}
+                                        </Text>
+                                    ) : (
+                                        <Text style={styles.instructionText}>
+                                            Enter a phone number to search for friends
+                                        </Text>
+                                    )
+                                }
+                            />
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.modalCloseButton}
+                            onPress={() => {
+                                setIsAddFriendModalVisible(false);
+                                setPhoneSearch('');
+                                setSearchResults([]);
+                            }}
+                        >
+                            <Text style={styles.modalCloseButtonText}>Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -349,6 +529,105 @@ const styles = StyleSheet.create({
     listContainer: {
         paddingBottom: 16,
     },
+    floatingButton: {
+        position: 'absolute',
+        bottom: 30,
+        right: 30,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#4285F4',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+    },
+    floatingButtonText: {
+        color: 'white',
+        fontSize: 28,
+        fontWeight: 'bold',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        padding: 20,
+    },
+    modalContainer: {
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 20,
+        maxHeight: '80%',
+    },
+    modalSearchBar: {
+        marginVertical: 10,
+        backgroundColor: '#f5f5f5',
+    },
+    searchResultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#e0e0e0',
+    },
+    searchResultAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 10,
+    },
+    searchResultText: {
+        flex: 1,
+    },
+    searchResultName: {
+        fontWeight: '500',
+    },
+    searchResultPhone: {
+        color: '#666',
+        fontSize: 12,
+    },
+    addButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        backgroundColor: '#4285F4',
+    },
+    addButtonSent: {
+        backgroundColor: '#34A853',
+    },
+    addButtonText: {
+        color: 'white',
+        fontSize: 12,
+    },
+    modalLoader: {
+        marginVertical: 20,
+    },
+    noResultsText: {
+        textAlign: 'center',
+        marginVertical: 20,
+        color: '#666',
+    },
+    instructionText: {
+        textAlign: 'center',
+        marginVertical: 20,
+        color: '#666',
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    modalCloseButton: {
+        marginTop: 20,
+        padding: 10,
+        backgroundColor: '#4285F4',
+        borderRadius: 5,
+        alignItems: 'center',
+    },
+    modalCloseButtonText: {
+        color: 'white',
+        fontSize: 16,
+    },
+    
 });
 
 
