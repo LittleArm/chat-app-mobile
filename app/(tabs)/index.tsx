@@ -149,7 +149,7 @@ const ConversationListScreen = () => {
                 conversationsData.map(async (conv) => {
                     try {
                         const messagesResponse = await conversationAPI.chatDetail(conv.id);
-                        const messages = messagesResponse;
+                        const messages = messagesResponse || [];
 
                         const lastMessage = messages.length > 0
                             ? messages.reduce((latest, current) =>
@@ -158,7 +158,6 @@ const ConversationListScreen = () => {
                             : undefined;
 
                         const participantInfo = await getParticipantInfo(conv.participants, currentUserId);
-
                         return {
                             conversation: conv,
                             name: participantInfo.name,
