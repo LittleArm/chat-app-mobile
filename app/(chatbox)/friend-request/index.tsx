@@ -140,8 +140,7 @@ const FriendRequestScreen = () => {
                 queryClient.setQueryData(["receivedFriendRequests", currentUserId], freshData);
             }
         } catch (error) {
-            // Silent fail - we already did optimistic update
-            console.log("Background refresh failed, using optimistic update");
+            console.log(error);
         }
     }, [queryClient, currentUserId, toaster]);
 

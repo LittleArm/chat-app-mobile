@@ -10,8 +10,4 @@ export const userAPI = {
     getUserProfile(userId: number) {
         return http.get<ProfileResponse>(USER_URL.GET_USER_PROFILE.replace(":userId", userId.toString()));
     },
-
-    //uploadAvatar(userId: number, avatar: string) {
-
-    //}
 };

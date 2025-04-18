@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
     },
     headerContainer: {
-        padding: 10,
+        padding: 0,
         backgroundColor: '#fff',
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#e0e0e0',

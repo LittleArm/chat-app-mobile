@@ -1,7 +1,6 @@
 import { authAPI } from "@/api";
 import { userAPI } from "@/api/user.api";
-import { useAuth } from "@/contexts/AuthContext";
-import { ProfileResponse } from "@/types/api/response/profile.response";
+import { ProfileResponse } from "@/types/api/response";
 import { STORAGE_KEY } from "@/utils/constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -9,6 +8,7 @@ import { router, useFocusEffect } from "expo-router";
 import * as React from "react";
 import {
     Image,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -17,223 +17,271 @@ import {
 } from "react-native";
 import { Button } from "react-native-paper";
 import { useToast } from "react-native-paper-toast";
-import { useMutation, useQuery } from "react-query";
+import { useQuery } from "react-query";
 import * as ImageManipulator from "expo-image-manipulator";
 
 const SettingsScreen = () => {
     const toaster = useToast();
-    const { setAccessToken, setUserId } = useAuth();
+    const [userId, setUserId] = React.useState<number | null>(null);
     const [profileInfo, setProfileInfo] = React.useState<ProfileResponse>({
-        fullname: "",
+        id: 0,
+        username: "",
+        email: "",
+        phone: "",
+        first_name: "",
+        last_name: "",
         avatar: "",
-        id: "",
+        created_at: new Date(),
+        updated_at: new Date()
     });
+
+    // Load user ID on mount
+    React.useEffect(() => {
+        const loadUserData = async () => {
+            try {
+                const id = await AsyncStorage.getItem(STORAGE_KEY.ID);
+                if (id) setUserId(Number(id));
+            } catch (error) {
+                console.error("Failed to load user ID:", error);
+                toaster.show({
+                    message: "Failed to load user data",
+                    type: "error"
+                });
+            }
+        };
+        loadUserData();
+    }, []);
 
     // Pick image from gallery
     const pickImage = async () => {
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            toaster.show({
+                message: "Permission to access photos was denied",
+                type: "error"
+            });
+            return;
+        }
+
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0,
+            quality: 0.8,
         });
 
-        if (!result.canceled) {
-            const { uri, width, height } = result.assets[0];
-            const manipResult = await ImageManipulator.manipulateAsync(
-                uri,
-                [{ resize: { width: width * 0.5, height: height * 0.5 } }],
-                {
-                    compress: 0.5,
-                    format: ImageManipulator.SaveFormat.JPEG,
-                    base64: true,
+        if (!result.canceled && result.assets[0]) {
+            try {
+                const { uri, width, height } = result.assets[0];
+                const manipResult = await ImageManipulator.manipulateAsync(
+                    uri,
+                    [{ resize: { width: Math.floor(width * 0.5), height: Math.floor(height * 0.5) } }],
+                    {
+                        compress: 0.7,
+                        format: ImageManipulator.SaveFormat.JPEG,
+                        base64: true,
+                    }
+                );
+                if (manipResult.base64) {
+                    setProfileInfo(prev => ({
+                        ...prev,
+                        avatar: manipResult.base64
+                    }));
                 }
-            );
-            setProfileInfo((prev) => ({ ...prev, avatar: manipResult.base64 }));
+            } catch (error) {
+                console.error("Image processing error:", error);
+                toaster.show({
+                    message: "Failed to process image",
+                    type: "error"
+                });
+            }
         }
     };
 
-    // Save profile settings
-    const saveSettings = () => {
-        updateProfile.mutate({
-            profileId: profileInfo.id,
-            fullname: profileInfo.fullname,
-            avatar: profileInfo.avatar,
-        });
-    };
-
     // Fetch user profile
-    const {
-        refetch: refetchGetUserInfo,
-        isLoading: loadingGetUserInfo,
-    } = useQuery({
-        queryKey: ["getMyProfile"],
-        queryFn: () => userAPI.getMyProfile(),
-        onSuccess: (response) => {
-            if (response.data) {
-                const profile: ProfileResponse = response.data[0];
-                setProfileInfo(profile);
-            }
+    const { refetch: refetchUserProfile, isLoading: loadingProfile } = useQuery({
+        queryKey: ["userProfile", userId],
+        queryFn: async () => {
+            if (!userId) throw new Error("No user ID");
+            const response = await userAPI.getUserProfile(userId);
+            return response.data;
+        },
+        onSuccess: (data) => {
+            setProfileInfo(data);
         },
         onError: (error: any) => {
             toaster.show({
-                message: "Failed to load profile",
+                message: error.response?.data?.message || "Failed to load profile",
                 type: "error"
             });
         },
-        enabled: false,
+        enabled: !!userId
     });
 
     // Refresh data when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
-            refetchGetUserInfo();
-        }, [])
+            if (userId) refetchUserProfile();
+        }, [userId])
     );
 
-    // Update profile mutation
-    const updateProfile = useMutation(userAPI.updateProfile, {
-        onSuccess: () => {
-            toaster.show({
-                message: "Profile saved successfully",
-                duration: 2000,
-                type: "success",
-            });
-            refetchGetUserInfo();
-        },
-        onError: (error: any) => {
-            toaster.show({
-                message: error.message || "Failed to save profile",
-                duration: 2000,
-                type: "error",
-            });
-        },
-    });
-
-    // Logout mutation
-    const { isLoading, mutate: logout } = useMutation(authAPI.logout, {
-        onSuccess: async () => {
-            await AsyncStorage.clear();
-            setAccessToken("");
-            setUserId("");
-            router.replace("/(auth)");
-        },
-        onError: (error: any) => {
-            toaster.show({
-                message: error.message || "Logout failed",
-                type: "error",
-            });
-        },
-    });
-
+    // Simplified logout function using just access token
     const handleLogout = async () => {
-        const refresh_token = await AsyncStorage.getItem(STORAGE_KEY.REFRESH_TOKEN);
-        if (refresh_token) {
-            logout({ refresh_token });
+        try {
+            // Clear all stored authentication data
+            await AsyncStorage.multiRemove([
+                STORAGE_KEY.ACCESS_TOKEN,
+                STORAGE_KEY.ID
+            ]);
+
+            setUserId(null);
+            // Navigate to auth screen
+            router.replace("/(auth)");
+
+            // Optional: Call logout API if needed
+            await authAPI.logout(); 
+
+        } catch (error) {
+            console.error("Logout error:", error);
+            toaster.show({
+                message: "Failed to logout properly",
+                type: "error"
+            });
         }
     };
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.header}>Settings</Text>
+        <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+        >
+            <View style={styles.container}>
+                <Text style={styles.header}>Settings</Text>
 
-            {!loadingGetUserInfo && (
-                <>
-                    <TouchableOpacity onPress={pickImage}>
-                        <Image
-                            source={
-                                profileInfo.avatar
-                                    ? { uri: `data:image/png;base64, ${profileInfo.avatar}` }
-                                    : require("@/assets/images/icon.png")
-                            }
-                            style={styles.profileImage}
-                        />
-                        <Text style={styles.changePhotoText}>Change Profile Picture</Text>
-                    </TouchableOpacity>
+                {!loadingProfile && (
+                    <>
+                        <TouchableOpacity onPress={pickImage}>
+                            <Image
+                                source={
+                                    profileInfo.avatar
+                                        ? { uri: `data:image/jpeg;base64,${profileInfo.avatar}` }
+                                        : require("@/assets/images/default-avatar.png")
+                                }
+                                style={styles.profileImage}
+                            />
+                            <Text style={styles.changePhotoText}>Change Profile Picture</Text>
+                        </TouchableOpacity>
 
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Full Name</Text>
-                        <TextInput
-                            value={profileInfo.fullname}
-                            onChangeText={(value: string) =>
-                                setProfileInfo({ ...profileInfo, fullname: value })
-                            }
-                            style={styles.input}
-                            placeholder="Enter your full name"
-                        />
-                    </View>
-                </>
-            )}
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>First Name</Text>
+                            <TextInput
+                                value={profileInfo.first_name}
+                                onChangeText={(text) =>
+                                    setProfileInfo({ ...profileInfo, first_name: text })
+                                }
+                                style={styles.input}
+                                placeholder="Enter your first name"
+                            />
+                        </View>
 
-            <Button
-                mode="contained"
-                onPress={saveSettings}
-                style={styles.saveButton}
-                loading={updateProfile.isLoading}
-            >
-                Save
-            </Button>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Last Name</Text>
+                            <TextInput
+                                value={profileInfo.last_name}
+                                onChangeText={(text) =>
+                                    setProfileInfo({ ...profileInfo, last_name: text })
+                                }
+                                style={styles.input}
+                                placeholder="Enter your last name"
+                            />
+                        </View>
 
-            <Button
-                mode="contained"
-                onPress={handleLogout}
-                style={styles.logoutButton}
-                loading={isLoading}
-            >
-                Logout
-            </Button>
-        </View>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Phone Number</Text>
+                            <TextInput
+                                value={profileInfo.phone}
+                                onChangeText={(text) =>
+                                    setProfileInfo({ ...profileInfo, phone: text })
+                                }
+                                style={styles.input}
+                                placeholder="Enter your phone number"
+                                keyboardType="phone-pad"
+                            />
+                        </View>
+                    </>
+                )}
+
+                <Button
+                    mode="contained"
+                    onPress={handleLogout}
+                    style={styles.logoutButton}
+                >
+                    Logout
+                </Button>
+            </View>
+        </ScrollView>
     );
 };
 
 const styles = StyleSheet.create({
+    scrollContainer: {
+        flexGrow: 1,
+    },
     container: {
         flex: 1,
         padding: 20,
         backgroundColor: "#fff",
+        paddingBottom: 40, // Add extra padding at the bottom
     },
     header: {
         fontSize: 24,
         fontWeight: "bold",
         marginBottom: 20,
+        textAlign: "center",
     },
     profileImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
+        width: 120,
+        height: 120,
+        borderRadius: 60,
         alignSelf: "center",
         marginBottom: 10,
+        borderWidth: 2,
+        borderColor: "#eee",
     },
     changePhotoText: {
         textAlign: "center",
         color: "#0190f3",
         marginBottom: 20,
+        fontWeight: "500",
     },
     inputGroup: {
-        marginBottom: 20,
+        marginBottom: 15,
     },
     label: {
         fontSize: 16,
-        marginBottom: 8,
+        marginBottom: 5,
         fontWeight: "500",
+        color: "#333",
     },
     input: {
         borderWidth: 1,
-        borderColor: "#ccc",
+        borderColor: "#ddd",
         padding: 12,
-        borderRadius: 5,
+        borderRadius: 8,
         fontSize: 16,
+        backgroundColor: "#f9f9f9",
     },
     saveButton: {
-        marginTop: 10,
-        backgroundColor: "#0190f3",
-        paddingVertical: 8,
+        marginTop: 20,
+        backgroundColor: "#4CAF50",
+        paddingVertical: 10,
+        borderRadius: 8,
     },
     logoutButton: {
         marginTop: 15,
         backgroundColor: "#f44336",
-        paddingVertical: 8,
+        paddingVertical: 10,
+        borderRadius: 8,
     },
 });
 

@@ -16,6 +16,6 @@ export const authAPI = {
         return http.post<LoginResponse>(AUTH_URL.LOGIN, loginDto);
     },
     logout() {
-        return http.post<{ message: string }>(AUTH_URL.LOGOUT);
+        return http.get<{ message: string }>(AUTH_URL.LOGOUT);
     }
 };
