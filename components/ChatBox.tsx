@@ -252,7 +252,10 @@ const ChatBoxComponent = ({
                     </TouchableOpacity>
                     <View>
                         <Image
-                            source={{ uri: avatar ? `data:image/png;base64, ${avatar}` : "@/assets/images/default-avatar.png" }}
+                            source={{
+                                uri: `data:image/png;base64, ${avatar}`,
+                            }}
+                            defaultSource={require("@/assets/images/default-avatar.png")}
                             style={styles.avatar}
                         />
                     </View>
@@ -299,8 +302,8 @@ const styles = StyleSheet.create({
         borderBottomWidth: 0.2,
     },
     avatar: {
-        height: 49,
-        width: 49,
+        height: 40,
+        width: 40,
         borderRadius: 999,
     },
     headerText: {

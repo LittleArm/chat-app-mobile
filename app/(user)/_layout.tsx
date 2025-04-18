@@ -6,9 +6,9 @@ export {
 } from "expo-router";
 
 export default function GroupSettingLayout() {
-  return (
-    <Stack>
-      <Stack.Screen options={{headerTitle: 'Trang cá nhân'}} name="index" />
-    </Stack>
-  );
+    return (
+        <Stack>
+            <Stack.Screen options={{headerTitle: 'Trang cá nhân'}} name="index" />
+        </Stack>
+    );
 }

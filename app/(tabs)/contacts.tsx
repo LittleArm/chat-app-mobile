@@ -51,15 +51,14 @@ const RenderItem = React.memo(({ item, onCallPress }: { item: FriendItem, onCall
     }, [item, fullName]);
 
     const handleGoToBio = useCallback(() => {
-        console.log("Bio Press");
-        //router.push({
-        //    pathname: "/(user)",
-        //    params: {
-        //        avatar: item.avatar,
-        //        name: fullName,
-        //        toUserId: item.id.toString(),
-        //    },
-        //});
+        router.push({
+            pathname: "/(user)",
+            params: {
+                avatar: item.avatar,
+                name: fullName,
+                toUserId: item.id.toString(),
+            },
+        });
     }, [item, fullName]);
 
     return (

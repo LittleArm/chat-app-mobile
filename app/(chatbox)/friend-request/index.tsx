@@ -44,8 +44,7 @@ const FriendRequestItem = React.memo(({
             params: {
                 avatar: avatar ?? "",
                 name: fullName,
-                username: username,
-                userId: request.user_id.toString(),
+                toUserId: request.user_id.toString(),
             },
         });
     };
