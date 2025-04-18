@@ -156,7 +156,7 @@ const SettingsScreen = () => {
             keyboardShouldPersistTaps="handled"
         >
             <View style={styles.container}>
-                <Text style={styles.header}>Settings</Text>
+                <Text style={styles.header}>Profile</Text>
 
                 {!loadingProfile && (
                     <>

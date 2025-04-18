@@ -60,13 +60,16 @@ const ConversationListScreen = () => {
     }, []);
 
     // Fetch conversations
-    const { data: conversationsData, isLoading, refetch } = useQuery(
+    const { data: conversationsData = [], isLoading, refetch } = useQuery(
         ['conversations', currentUserId],
         async () => {
             const response = await conversationAPI.listConversations(currentUserId!);
-            return response;
+            return response || []; // Ensure we always return an array
         },
-        { enabled: !!currentUserId }
+        {
+            enabled: !!currentUserId,
+            initialData: [] // Initialize as empty array
+        }
     );
 
     // Fetch friends list - remove the enabled condition
@@ -137,7 +140,7 @@ const ConversationListScreen = () => {
     // Fetch last message and participant names for each conversation
     useEffect(() => {
         const fetchConversationDetails = async () => {
-            if (!conversationsData || !Array.isArray(conversationsData) || !currentUserId) {
+            if (!currentUserId) {
                 setEnrichedConversations([]);
                 return;
             }
@@ -179,7 +182,7 @@ const ConversationListScreen = () => {
         };
 
         fetchConversationDetails();
-    }, [conversationsData]);
+    }, [conversationsData, currentUserId]);
 
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
@@ -191,12 +194,14 @@ const ConversationListScreen = () => {
         }
     }, [refetch, refetchFriends]);
 
-    const filteredConversations = enrichedConversations.filter(({ conversation, name }) => {
-        const searchLower = searchQuery.toLowerCase();
-        return (
-            name?.toLowerCase().includes(searchLower)
-        );
-    });
+    const filteredConversations = useMemo(() => {
+        return enrichedConversations.filter(({ conversation, name }) => {
+            const searchLower = searchQuery.toLowerCase();
+            return (
+                name?.toLowerCase().includes(searchLower)
+            );
+        });
+    }, [enrichedConversations, searchQuery]);
 
     const handleFriendSelection = (friendId: number) => {
         setSelectedFriends(prev => {

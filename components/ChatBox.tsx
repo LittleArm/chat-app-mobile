@@ -260,7 +260,7 @@ const ChatBoxComponent = ({
           </TouchableOpacity>
           <View>
             <Image
-              source={{ uri: avatar ? `data:image/png;base64, ${avatar}` : "" }}
+              source={{ uri: avatar ? `data:image/png;base64, ${avatar}` : "@/assets/images/default-avatar.png" }}
               style={styles.avatar}
             />
           </View>
