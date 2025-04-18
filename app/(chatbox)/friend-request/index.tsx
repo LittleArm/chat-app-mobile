@@ -105,7 +105,10 @@ const FriendRequestScreen = () => {
     } = useQuery<FriendRequestResponse[]>(
         ["receivedFriendRequests", currentUserId],
         () => friendAPI.getReceivedFriendRequests(currentUserId).then(res => res.data),
-        { staleTime: Infinity } // Only load once unless explicitly refreshed
+        {
+            staleTime: Infinity,
+            enabled: currentUserId !== null,
+        } // Only load once unless explicitly refreshed
     );
 
     const onRefresh = useCallback(async () => {

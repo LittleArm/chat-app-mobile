@@ -12,7 +12,7 @@ export default function DetailMessageLayout() {
       <Stack.Screen options={{headerTitle: 'Nhóm chat', headerShown: false}} name="group-chatbox" />
       <Stack.Screen options={{headerTitle: 'Tạo nhóm'}} name="create-group" />
       <Stack.Screen options={{headerTitle: 'Thêm bạn'}} name="add-friend" />
-      <Stack.Screen options={{headerTitle: 'Lời mời kết bạn'}} name="friend-request" />
+      <Stack.Screen options={{headerTitle: 'Friend Requests'}} name="friend-request" />
       <Stack.Screen options={{headerShown: false }} name="group-setting" />
     </Stack>
   );

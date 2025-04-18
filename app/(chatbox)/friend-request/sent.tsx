@@ -29,7 +29,9 @@ const FriendRequestItem = React.memo(({
     const { data: userProfile } = useQuery<ProfileResponse>(
         ["userProfile", request.friend_id],
         () => userAPI.getUserProfile(request.friend_id).then(res => res.data),
-        { staleTime: Infinity } // Only load once unless explicitly refreshed
+        {
+            staleTime: Infinity,
+        } // Only load once unless explicitly refreshed
     );
 
     const avatar = userProfile?.avatar;

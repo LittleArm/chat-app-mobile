@@ -89,6 +89,7 @@ export default function LoginScreen() {
                     placeholder="Phone"
                     value={loginInfo.phone}
                     onChangeText={handleChangePhone}
+                    keyboardType="phone-pad"
                     theme={{ colors: { primary: '#4FC3F7' } }}
                 />
                 <TextInput

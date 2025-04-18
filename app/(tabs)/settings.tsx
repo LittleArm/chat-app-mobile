@@ -181,6 +181,7 @@ const SettingsScreen = () => {
                                 }
                                 style={styles.input}
                                 placeholder="Enter your first name"
+                                readOnly
                             />
                         </View>
 
@@ -193,6 +194,7 @@ const SettingsScreen = () => {
                                 }
                                 style={styles.input}
                                 placeholder="Enter your last name"
+                                readOnly
                             />
                         </View>
 
@@ -206,6 +208,7 @@ const SettingsScreen = () => {
                                 style={styles.input}
                                 placeholder="Enter your phone number"
                                 keyboardType="phone-pad"
+                                readOnly
                             />
                         </View>
                     </>

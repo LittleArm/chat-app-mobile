@@ -147,7 +147,7 @@ const FriendListScreen = () => {
         enabled: !!currentUserId,
     });
 
-    const { data: friendRequests } = useQuery({
+    const { data: friendRequests = [] } = useQuery({
         queryKey: ["friendRequests", currentUserId],        
         queryFn: () => {
             return friendAPI.getReceivedFriendRequests(currentUserId);
