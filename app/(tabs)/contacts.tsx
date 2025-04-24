@@ -152,7 +152,7 @@ const FriendListScreen = () => {
         queryFn: () => {
             return friendAPI.getReceivedFriendRequests(currentUserId);
         },
-        select: (response) => response.data,
+        select: (response) => response,
         enabled: !!currentUserId,
     });
 
@@ -178,48 +178,44 @@ const FriendListScreen = () => {
             setIsSearching(true);
             try {
                 console.log('Starting search with phone:', phoneSearch);
-                
+
                 // First, refresh the friends list to ensure we have the latest data
                 const friendsResponse = await refetch();
                 const currentFriends = friendsResponse.data || [];
                 console.log('Current friends:', currentFriends.map(f => f.id));
-                
-                // Then perform the search
-                const response = await friendAPI.findUsers(phoneSearch);
+
+                // Then perform the search using the new API signature
+                const response = await friendAPI.findUsers(currentUserId, phoneSearch);
                 console.log('Search results:', response.data.users.map(u => u.id));
-                
-                // Convert currentUserId to string for consistent comparison
-                const currentUserIdStr = String(currentUserId);
-                
+
                 // Filter out unwanted results with proper type comparison
                 const filteredResults = response.data.users.filter(user => {
-                    const userIdStr = String(user.id);
-                    const isCurrentUser = userIdStr === currentUserIdStr;
-                    const isExistingFriend = currentFriends.some(friend => 
-                        String(friend.id) === userIdStr
+                    const isCurrentUser = user.id === String(currentUserId);
+                    const isExistingFriend = currentFriends.some(friend =>
+                        String(friend.id) === user.id
                     );
-                    
-                    console.log(`User ${userIdStr}:`, {
+
+                    console.log(`User ${user.id}:`, {
                         isCurrentUser,
                         isExistingFriend,
                         shouldInclude: !isCurrentUser && !isExistingFriend,
                     });
-                    
+
                     return !isCurrentUser && !isExistingFriend;
                 });
-    
+
                 console.log('Filtered results:', filteredResults.map(u => u.id));
-                
+
                 setSearchResults(filteredResults.map(user => ({
-                    id: user.id,
+                    id: Number(user.id), // Convert to number if needed
                     username: user.username,
                     email: user.email,
                     phone: user.phone,
                     first_name: user.first_name,
                     last_name: user.last_name,
                     avatar: user.avatar || null,
-                    created_at: user.CreateAt ? user.CreateAt.toISOString() : '',
-                    updated_at: user.UpdatedAt ? user.UpdatedAt.toISOString() : '',
+                    created_at: user.created_at,
+                    updated_at: user.updated_at,
                 })));
             } catch (error) {
                 console.error('Search error:', error);
@@ -379,8 +375,8 @@ const FriendListScreen = () => {
                                 ListEmptyComponent={
                                     phoneSearch ? (
                                         <Text style={styles.noResultsText}>
-                                            {searchResults.length === 0 && !isSearching 
-                                                ? "No users found or user is already your friend" 
+                                            {searchResults.length === 0 && !isSearching
+                                                ? "No users found or user is already your friend"
                                                 : "No users found with this phone number"}
                                         </Text>
                                     ) : (

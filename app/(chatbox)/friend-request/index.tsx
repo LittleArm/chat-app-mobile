@@ -104,12 +104,14 @@ const FriendRequestScreen = () => {
         refetch,
     } = useQuery<FriendRequestResponse[]>(
         ["receivedFriendRequests", currentUserId],
-        () => friendAPI.getReceivedFriendRequests(currentUserId).then(res => res.data),
+        () => friendAPI.getReceivedFriendRequests(currentUserId).then(res => res),
         {
             staleTime: Infinity,
             enabled: currentUserId !== null,
         } // Only load once unless explicitly refreshed
     );
+
+    console.log("FriendRequestScreen", requests);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -134,7 +136,7 @@ const FriendRequestScreen = () => {
         try {
             const freshData = await queryClient.fetchQuery<FriendRequestResponse[]>(
                 ["receivedFriendRequests", currentUserId],
-                () => friendAPI.getReceivedFriendRequests(currentUserId).then(res => res.data)
+                () => friendAPI.getReceivedFriendRequests(currentUserId).then(res => res)
             );
 
             // Only update if the fresh data is different from our optimistic update

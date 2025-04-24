@@ -1,5 +1,4 @@
 import { friendAPI } from "@/api/friend.api";
-import { userAPI } from "@/api/user.api";
 import { router } from "expo-router";
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -14,7 +13,6 @@ import {
 import { ActivityIndicator, IconButton } from "react-native-paper";
 import { useToast } from "react-native-paper-toast";
 import { useMutation, useQuery, useQueryClient } from "react-query";
-import { ProfileResponse } from "@/types/api/response";
 import { FriendRequestResponse } from "@/types/api/response/friend-request.response";
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,17 +24,9 @@ const FriendRequestItem = React.memo(({
     request: FriendRequestResponse,
     onCancel: (friendId: number) => void
 }) => {
-    const { data: userProfile } = useQuery<ProfileResponse>(
-        ["userProfile", request.friend_id],
-        () => userAPI.getUserProfile(request.friend_id).then(res => res.data),
-        {
-            staleTime: Infinity,
-        } // Only load once unless explicitly refreshed
-    );
-
-    const avatar = userProfile?.avatar;
-    const fullName = userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : `User ${request.friend_id}`;
-    const username = userProfile?.username ?? "";
+    const avatar = request.avatar;
+    const fullName = `${request.first_name} ${request.last_name}`;
+    const username = request.username;
 
     const navigateToProfile = () => {
         router.push({
@@ -44,7 +34,7 @@ const FriendRequestItem = React.memo(({
             params: {
                 avatar: avatar ?? "",
                 name: fullName,
-                toUserId: request.friend_id.toString(),
+                toUserId: request.user_id.toString(),
             },
         });
     };
@@ -67,7 +57,7 @@ const FriendRequestItem = React.memo(({
                 icon="close"
                 size={24}
                 iconColor="#F44336"
-                onPress={() => onCancel(request.friend_id)}
+                onPress={() => onCancel(request.user_id)}
             />
         </View>
     );
@@ -97,10 +87,10 @@ const FriendRequestSent = () => {
         refetch,
     } = useQuery<FriendRequestResponse[]>(
         ["sentFriendRequests", currentUserId],
-        () => friendAPI.getSentFriendRequests(currentUserId).then(res => res.data),
+        () => friendAPI.getSentFriendRequests(currentUserId),
         {
-            staleTime: Infinity, // Only load once unless explicitly refreshed
-            enabled: !!currentUserId // Only fetch when we have a user ID
+            staleTime: Infinity,
+            enabled: !!currentUserId
         }
     );
 
@@ -116,14 +106,14 @@ const FriendRequestSent = () => {
         // Optimistically update the cache
         queryClient.setQueryData<FriendRequestResponse[]>(
             ["sentFriendRequests", currentUserId],
-            (oldData) => oldData?.filter(req => req.friend_id !== variables) ?? []
+            (oldData) => oldData?.filter(req => req.user_id !== variables) ?? []
         );
 
         // Background refresh for consistency
         try {
             const freshData = await queryClient.fetchQuery<FriendRequestResponse[]>(
                 ["sentFriendRequests", currentUserId],
-                () => friendAPI.getSentFriendRequests(currentUserId).then(res => res.data)
+                () => friendAPI.getSentFriendRequests(currentUserId)
             );
 
             if (JSON.stringify(freshData) !== JSON.stringify(requests)) {
@@ -143,7 +133,7 @@ const FriendRequestSent = () => {
                 await queryClient.cancelQueries(["sentFriendRequests", currentUserId]);
                 queryClient.setQueryData<FriendRequestResponse[]>(
                     ["sentFriendRequests", currentUserId],
-                    (oldData) => oldData?.filter(req => req.friend_id !== friendId) || []
+                    (oldData) => oldData?.filter(req => req.user_id !== friendId) || []
                 );
             },
             onError: (error: any) => {
