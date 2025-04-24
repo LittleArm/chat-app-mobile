@@ -8,7 +8,6 @@ import { STORAGE_KEY } from "@/utils/constants";
 import { useMutation } from "react-query";
 import { authAPI } from "@/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 export default function LoginScreen() {
     const [loginInfo, setLoginInfo] = useState({
         phone: "",

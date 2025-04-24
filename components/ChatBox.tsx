@@ -15,6 +15,8 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Keyboard,
+    Platform,
 } from "react-native";
 import { Bubble, GiftedChat, IMessage } from "react-native-gifted-chat";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,16 +26,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocalSearchParams } from 'expo-router';
 import { conversationAPI } from "@/api/conversation.api";
 import { STORAGE_KEY } from "@/utils/constants";
+import EmojiSelector from "react-native-emoji-selector";
 
 interface ChatInputProps {
     reset?: number;
     onSubmit?: (text: string) => void;
     setMessages: React.Dispatch<React.SetStateAction<IMessage[]>>;
 }
+
 const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
     const { userId } = useAuth();
     const params = useLocalSearchParams();
     const [inputMessage, setInputMessage] = useState("");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [userInfo, setUserInfo] = useState({
         id: userId?.toString() || "",
         username: "User",
@@ -52,13 +57,12 @@ const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
                 const response = await conversationAPI.getUserInfo_chatbox(Number(userId));
                 if (response.data) {
                     setUserInfo(prev => ({
-                        ...prev,  // Keep existing defaults for missing fields
-                        ...response.data  // Overwrite with API data
+                        ...prev,
+                        ...response.data
                     }));
                 }
             } catch (error) {
                 console.error("Failed to fetch user info:", error);
-                // State already has defaults, no need to set
             }
         };
 
@@ -103,46 +107,78 @@ const ChatInput: FC<ChatInputProps> = ({ reset, onSubmit, setMessages }) => {
             return;
         }
 
-        // Create a temporary message object
         const tempMessage = {
-            _id: Math.round(Math.random() * 1000000).toString(), // Temporary ID
+            _id: Math.round(Math.random() * 1000000).toString(),
             text: inputMessage,
             createdAt: new Date(),
             user: {
-                _id: userId, // Replace with your current user's ID
+                _id: userId,
             },
-            // You might want to add a 'pending' flag if you need to track unsent messages
         };
 
-        // Optimistically update the UI
         setMessages(previousMessages => GiftedChat.append(previousMessages, [tempMessage]));
-
-        console.log("Sending message:", inputMessage);
         ws.current.send(inputMessage);
         setInputMessage("");
+        setShowEmojiPicker(false);
+        Keyboard.dismiss();
+    };
 
-        // If your WebSocket sends back confirmation, you might update the temporary message
-        // with the actual server data when received
+    const handleEmojiSelect = (emoji: string) => {
+        setInputMessage(prev => prev + emoji);
+    };
+
+    const toggleEmojiPicker = () => {
+        setShowEmojiPicker(prev => !prev);
+        Keyboard.dismiss();
     };
 
     return (
         <View style={styles.inputContainer}>
+            {showEmojiPicker && (
+                <View style={styles.emojiPickerContainer}>
+                    <EmojiSelector
+                        onEmojiSelected={handleEmojiSelect}
+                        columns={8}
+                        showSearchBar={false}
+                        showHistory={true}
+                        showSectionTitles={false}
+                    />
+                </View>
+            )}
             <View style={styles.inputMessageContainer}>
+                <TouchableOpacity
+                    onPress={toggleEmojiPicker}
+                    style={styles.emojiButton}
+                >
+                    <FontAwesome
+                        name={showEmojiPicker ? "keyboard-o" : "smile-o"}
+                        size={24}
+                        color="#666"
+                    />
+                </TouchableOpacity>
                 <TextInput
                     style={styles.input}
-                    placeholder="Nhập tin nhắn"
-                    placeholderTextColor="black"
+                    placeholder="Type a message..."
+                    placeholderTextColor="#999"
                     value={inputMessage}
                     onChangeText={handleInputText}
+                    multiline
+                    blurOnSubmit={false}
                 />
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <TouchableOpacity
-                        onPress={handleOnPressSendButton}
-                        style={styles.sendButton}
-                    >
-                        <FontAwesome name="send" size={22} color={"gray"} />
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    onPress={handleOnPressSendButton}
+                    style={[
+                        styles.sendButton,
+                        inputMessage.trim() ? styles.activeSendButton : null
+                    ]}
+                    disabled={!inputMessage.trim()}
+                >
+                    <FontAwesome
+                        name="send"
+                        size={20}
+                        color={inputMessage.trim() ? "#007AFF" : "#ccc"}
+                    />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -186,12 +222,7 @@ const ChatBoxComponent = ({
             }
         };
 
-        // Initial fetch
-
-        // Set up interval for periodic fetching
         const intervalId = setInterval(fetchChatHistory, 1000);
-
-        // Clean up interval on component unmount
         return () => clearInterval(intervalId);
     }, [conversationId]);
 
@@ -200,19 +231,23 @@ const ChatBoxComponent = ({
 
         if (currentMessage.user._id === userId) {
             return (
-                <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-end" }}>
+                <View style={styles.outgoingMessageContainer}>
                     <Bubble
                         {...props}
                         wrapperStyle={{
                             right: {
-                                backgroundColor: "#8bbbf7",
+                                backgroundColor: "#61d5ff",
                                 marginRight: 12,
-                                marginVertical: 12,
+                                marginVertical: 8,
+                                borderRadius: 12,
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
                             },
                         }}
                         textStyle={{
                             right: {
-                                color: "black",
+                                color: "#000",
+                                fontSize: 16,
                             },
                         }}
                     />
@@ -220,18 +255,25 @@ const ChatBoxComponent = ({
             );
         } else {
             return (
-                <View style={{ flex: 1, flexDirection: "row", justifyContent: "flex-start" }}>
+                <View style={styles.incomingMessageContainer}>
                     <Bubble
                         {...props}
                         wrapperStyle={{
                             left: {
+                                backgroundColor: "#FFFFFF",
                                 marginLeft: 12,
-                                marginVertical: 12,
+                                marginVertical: 8,
+                                borderRadius: 12,
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderWidth: 1,
+                                borderColor: "#EEE",
                             },
                         }}
                         textStyle={{
                             left: {
-                                color: "black",
+                                color: "#000",
+                                fontSize: 16,
                             },
                         }}
                     />
@@ -241,37 +283,33 @@ const ChatBoxComponent = ({
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+        <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.headerLeft}>
                     <TouchableOpacity
                         onPress={() => router.back()}
-                        style={{ marginRight: 18 }}
+                        style={styles.backButton}
                     >
-                        <FontAwesome name="arrow-left" size={22} color={"gray"} />
+                        <FontAwesome name="arrow-left" size={22} color={"#555"} />
                     </TouchableOpacity>
-                    <View>
-                        <Image
-                            source={{
-                                uri: `data:image/png;base64, ${avatar}`,
-                            }}
-                            defaultSource={require("@/assets/images/default-avatar.png")}
-                            style={styles.avatar}
-                        />
-                    </View>
-                    <View style={{ marginLeft: 16 }}>
-                        <Text style={styles.headerText}>{name}</Text>
-                    </View>
+                    <Image
+                        source={{
+                            uri: `data:image/png;base64, ${avatar}`,
+                        }}
+                        defaultSource={require("@/assets/images/default-avatar.png")}
+                        style={styles.avatar}
+                    />
+                    <Text style={styles.headerText} numberOfLines={1}>
+                        {name || "Chat"}
+                    </Text>
                 </View>
 
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        onPress={onSetting}
-                    >
-                        <Icon name="settings" size={24} color="#888" />
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={onSetting}
+                >
+                    <Icon name="settings" size={24} color="#666" />
+                </TouchableOpacity>
             </View>
 
             <GiftedChat
@@ -280,6 +318,18 @@ const ChatBoxComponent = ({
                 user={{ _id: userId }}
                 minInputToolbarHeight={0}
                 renderMessage={renderMessage}
+                bottomOffset={Platform.select({ ios: 50, android: 20 })}
+                alwaysShowSend={false}
+                scrollToBottom
+                scrollToBottomComponent={() => (
+                    <View style={styles.scrollToBottom}>
+                        <FontAwesome name="angle-double-down" size={22} color="#666" />
+                    </View>
+                )}
+                listViewProps={{
+                    style: styles.messagesList,
+                    keyboardDismissMode: "on-drag",
+                }}
             />
             <ChatInput reset={resetChatInput} setMessages={setMessages} />
         </SafeAreaView>
@@ -289,61 +339,106 @@ const ChatBoxComponent = ({
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#f2f3f5",
+        backgroundColor: "#F5F5F5",
     },
     header: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        backgroundColor: "#fff",
-        padding: 10,
-        elevation: 5,
-        borderBottomColor: "gray",
-        borderBottomWidth: 0.2,
+        backgroundColor: "#FFFFFF",
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#E0E0E0",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    headerLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        flex: 1,
+    },
+    backButton: {
+        marginRight: 16,
     },
     avatar: {
-        height: 40,
-        width: 40,
-        borderRadius: 999,
+        height: 36,
+        width: 36,
+        borderRadius: 18,
     },
     headerText: {
-        color: "gray",
+        color: "#333",
         fontSize: 18,
-        fontWeight: "bold",
+        fontWeight: "600",
+        marginLeft: 12,
+        flexShrink: 1,
     },
-    iconButton: {
-        marginHorizontal: 5,
-        padding: 8,
-        backgroundColor: "#fff",
-        borderRadius: 50,
+    settingsButton: {
+        padding: 4,
+        marginLeft: 8,
+    },
+    messagesList: {
+        backgroundColor: "#F5F5F5",
+    },
+    outgoingMessageContainer: {
+        flexDirection: "row",
+        justifyContent: "flex-end",
+        marginRight: 8,
+    },
+    incomingMessageContainer: {
+        flexDirection: "row",
+        justifyContent: "flex-start",
+        marginLeft: 8,
     },
     inputContainer: {
-        backgroundColor: "#fff",
-        height: 72,
-        alignItems: "center",
-        justifyContent: "center",
+        backgroundColor: "#FFFFFF",
+        borderTopWidth: 1,
+        borderTopColor: "#E0E0E0",
+        paddingBottom: Platform.select({ ios: 8, android: 4 }),
+    },
+    emojiPickerContainer: {
+        height: 250,
+        backgroundColor: "#F5F5F5",
     },
     inputMessageContainer: {
-        height: 54,
-        width: "90%",
         flexDirection: "row",
-        justifyContent: "center",
-        backgroundColor: "#fff",
-        borderRadius: 16,
         alignItems: "center",
-        borderColor: "rgba(128,128,128,.4)",
-        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
     },
     input: {
-        color: "black",
         flex: 1,
-        paddingHorizontal: 10,
+        minHeight: 40,
+        maxHeight: 120,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: "#F0F0F0",
+        borderRadius: 20,
+        fontSize: 16,
+        color: "#333",
+        lineHeight: 20,
+    },
+    emojiButton: {
+        padding: 8,
+        marginRight: 4,
     },
     sendButton: {
-        backgroundColor: "#fff",
-        padding: 4,
-        borderRadius: 999,
-        marginHorizontal: 6,
+        padding: 10,
+        marginLeft: 8,
+        borderRadius: 20,
+    },
+    activeSendButton: {
+        backgroundColor: "#E3F2FD",
+    },
+    scrollToBottom: {
+        backgroundColor: "#FFF",
+        borderRadius: 15,
+        padding: 6,
+        borderWidth: 1,
+        borderColor: "#EEE",
     },
 });
 
