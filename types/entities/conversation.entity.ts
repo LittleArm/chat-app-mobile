@@ -4,5 +4,6 @@ export class Conversation {
     updated_at: Date;
     deleted_at: Date;
     type: string;
-    creator_id: number;   
+    creator_id: number;
+    name: string;
 }

@@ -4,11 +4,11 @@ import { ConversationByUserResult } from "../types/api/response/conversation";
 import { User_Info_Response } from "../types/api/response/user_info.response";       
 
 export const CONVERSATION_URL = {
-    LIST_CONVERSATIONS: "/conversations/:userId",
+    LIST_CONVERSATIONS: "/user/:userId/conversations",
     CHAT_DETAIL: "/messages/:conversationId",
+    SEEN_MESSAGE: "/seenMessages/:conversationId",
     CREATE_CONVERSATION: "/ws/createConversation",
     JOIN_CONVERSATION: "/ws/joinConversation/:conversationId",
-    //GET_CONVERSATIONS: "/ws/getConversations",
     GET_CLIENTS: "/ws/getClients/:conversationId",
     GET_USER_INFO_CHAT: "/user/:userId",
 };
@@ -19,11 +19,14 @@ export const conversationAPI = {
             CONVERSATION_URL.LIST_CONVERSATIONS.replace(":userId", userId.toString())
         ).then(response => response.data.conversations);
     },
+
     chatDetail(conversationId: number): Promise<MessageResponse[]> {
         return http.get<{ messages: MessageResponse[] }>(
             CONVERSATION_URL.CHAT_DETAIL.replace(":conversationId", conversationId.toString())
         ).then(response => response.data.messages);
     },
+
+    //TODO
     createConversation(conversationData: any) {
         return http.post<{ id: string | number }>(CONVERSATION_URL.CREATE_CONVERSATION, conversationData);
     },
@@ -31,10 +34,6 @@ export const conversationAPI = {
     joinConversation(conversationId: number) {
         return http.get<{ message: string }>(CONVERSATION_URL.JOIN_CONVERSATION.replace(":conversationId", conversationId.toString()));
     },
-
-    //getConversations() {
-    //    return http.get<{ conversations: any[] }>(CONVERSATION_URL.GET_CONVERSATIONS);
-    //},
 
     getClients(conversationId: number) {
         return http.get<{ clients: any[] }>(CONVERSATION_URL.GET_CLIENTS.replace(":conversationId", conversationId.toString()));

@@ -1,8 +1,9 @@
 export class Participant {
     id: number;
-    created_at: Date;
-    updated_at: Date;
-    deleted_at: Date;
-    user_id: number;
-    conversation_id: number;
+    phone: string;
+    username: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar: string;
 }

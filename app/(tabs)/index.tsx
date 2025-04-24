@@ -5,7 +5,6 @@ import { useQuery } from 'react-query';
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { conversationAPI } from '@/api/conversation.api';
-import { userAPI } from '@/api/user.api';
 import { friendAPI } from '@/api/friend.api';
 import { router } from 'expo-router';
 import moment from 'moment';
@@ -13,19 +12,27 @@ import 'moment/locale/vi';
 
 moment.locale('vi');
 
-interface ConversationWithLastMessage {
-    conversation: {
+interface ConversationWithDetails {
+    id: number;
+    name: string;
+    type: string;
+    creator_id: number;
+    participants: {
         id: number;
-        type: string;
-        creator_id: number;
-        participants: number[];
-    };
-    lastMessage?: {
-        content: string;
-        createAt: Date;
-    };
-    name?: string;
-    avatar?: string;
+        phone: string;
+        username: string;
+        first_name: string;
+        last_name: string;
+        email: string;
+        avatar: string;
+    }[];
+    seen: boolean;
+    latest_message_id: number;
+    latest_message_sender_id: number;
+    latest_message_sender_name: string;
+    latest_message_sender_avatar: string;
+    latest_message_content: string;
+    latest_message_created_at: Date;
 }
 
 interface FriendItem {
@@ -41,7 +48,6 @@ const ConversationListScreen = () => {
     const [currentUserId, setCurrentUserId] = useState<number | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [enrichedConversations, setEnrichedConversations] = useState<ConversationWithLastMessage[]>([]);
     const [isPopupVisible, setIsPopupVisible] = useState(false);
     const [friendSearchQuery, setFriendSearchQuery] = useState('');
     const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
@@ -60,128 +66,70 @@ const ConversationListScreen = () => {
     }, []);
 
     // Fetch conversations
-    const { data: conversationsData = [], isLoading, refetch } = useQuery(
+    const { data: conversations = [], isLoading, refetch } = useQuery(
         ['conversations', currentUserId],
         async () => {
             const response = await conversationAPI.listConversations(currentUserId!);
-            return response || []; // Ensure we always return an array
+            return response || [];
         },
         {
             enabled: !!currentUserId,
-            initialData: [] // Initialize as empty array
+            initialData: []
         }
     );
 
-    // Fetch friends list - remove the enabled condition
+    // Fetch friends list
     const { data: friends, refetch: refetchFriends } = useQuery({
         queryKey: ["friends", currentUserId],
         queryFn: () => friendAPI.getFriends(currentUserId),
         select: (response) => response.data,
-        enabled: !!currentUserId, // Only enable if we have currentUserId
+        enabled: !!currentUserId,
     });
 
     // Mark friends with existing conversations
+    const [filteredFriends, setFilteredFriends] = useState<FriendItem[]>([]);
     useEffect(() => {
         if (friends) {
-            // Always set friends first
             let updatedFriends = [...friends];
-            
-            // Then enhance with conversation info if available
-            if (conversationsData) {
+
+            if (conversations) {
                 updatedFriends = updatedFriends.map(friend => {
-                    const hasExistingConversation = conversationsData.some(conv => 
-                        conv.participants.includes(friend.id) && 
+                    const hasExistingConversation = conversations.some(conv =>
+                        conv.participants.some(p => p.id === friend.id) &&
                         conv.type === 'private'
                     );
                     return { ...friend, hasExistingConversation };
                 });
             }
-            
+
             setFilteredFriends(updatedFriends);
         }
-    }, [friends, conversationsData]);
+    }, [friends, conversations]);
 
-    const [filteredFriends, setFilteredFriends] = useState<FriendItem[]>([]);
-
-    const getParticipantInfo = async (participantIds: number[], currentUserId: number) => {
-        try {
-            const uniqueParticipants = [...new Set(participantIds.filter(id => id !== currentUserId))];
-
-            if (uniqueParticipants.length === 1) {
-                const response = await userAPI.getUserProfile(uniqueParticipants[0]);
-                const fullName = `${response.data.first_name} ${response.data.last_name}`.trim();
-                return {
-                    name: fullName,
-                    avatar: response.data.avatar
-                };
-            }
-
-            const participantResponses = await Promise.all(
-                uniqueParticipants.map(id => userAPI.getUserProfile(id))
-            );
-
-            const participantNames = participantResponses.map(res =>
-                `${res.data.first_name} ${res.data.last_name}`.trim()
-            );
-
-            return {
-                name: participantNames.join(', '),
-                avatar: undefined
-            };
-        } catch (error) {
-            console.error('Error fetching participant info:', error);
-            return {
-                name: 'Unknown User',
-                avatar: undefined
-            };
+    const getConversationName = (conversation: ConversationWithDetails) => {
+        if (conversation.type === 'group' && conversation.name) {
+            return conversation.name;
         }
+
+        const otherParticipants = conversation.participants.filter(p => p.id !== currentUserId);
+        if (otherParticipants.length === 1) {
+            return `${otherParticipants[0].first_name} ${otherParticipants[0].last_name}`.trim() ||
+                otherParticipants[0].username;
+        }
+
+        return otherParticipants.map(p =>
+            `${p.first_name} ${p.last_name}`.trim() || p.username
+        ).join(', ');
     };
 
-    // Fetch last message and participant names for each conversation
-    useEffect(() => {
-        const fetchConversationDetails = async () => {
-            if (!currentUserId) {
-                setEnrichedConversations([]);
-                return;
-            }
+    const getConversationAvatar = (conversation: ConversationWithDetails) => {
+        if (conversation.type === 'group') {
+            return ''; // Use default avatar for groups
+        }
 
-            const results = await Promise.all(
-                conversationsData.map(async (conv) => {
-                    try {
-                        const messagesResponse = await conversationAPI.chatDetail(conv.id);
-                        const messages = messagesResponse || [];
-
-                        const lastMessage = messages.length > 0
-                            ? messages.reduce((latest, current) =>
-                                new Date(current.createAt) > new Date(latest.createAt) ? current : latest
-                            )
-                            : undefined;
-
-                        const participantInfo = await getParticipantInfo(conv.participants, currentUserId);
-                        return {
-                            conversation: conv,
-                            name: participantInfo.name,
-                            avatar: participantInfo.avatar,
-                            lastMessage: lastMessage ? {
-                                content: lastMessage.content,
-                                createAt: lastMessage.createAt
-                            } : undefined
-                        };
-                    } catch (error) {
-                        console.error(`Error processing conversation ${conv.id}:`, error);
-                        return {
-                            conversation: conv,
-                            name: `Conversation ${conv.id}`
-                        };
-                    }
-                })
-            );
-
-            setEnrichedConversations(results);
-        };
-
-        fetchConversationDetails();
-    }, [conversationsData, currentUserId]);
+        const otherParticipant = conversation.participants.find(p => p.id !== currentUserId);
+        return otherParticipant?.avatar || '';
+    };
 
     const handleRefresh = useCallback(async () => {
         setIsRefreshing(true);
@@ -194,13 +142,12 @@ const ConversationListScreen = () => {
     }, [refetch, refetchFriends]);
 
     const filteredConversations = useMemo(() => {
-        return enrichedConversations.filter(({ conversation, name }) => {
+        return conversations.filter(conversation => {
             const searchLower = searchQuery.toLowerCase();
-            return (
-                name?.toLowerCase().includes(searchLower)
-            );
+            const name = getConversationName(conversation).toLowerCase();
+            return name.includes(searchLower);
         });
-    }, [enrichedConversations, searchQuery]);
+    }, [conversations, searchQuery]);
 
     const handleFriendSelection = (friendId: number) => {
         setSelectedFriends(prev => {
@@ -214,24 +161,24 @@ const ConversationListScreen = () => {
 
     const handleConfirmSelection = useCallback(async () => {
         if (selectedFriends.length === 0 || !currentUserId) return;
-    
+
         try {
             // If only one friend is selected and has existing conversation, navigate to it
             if (selectedFriends.length === 1) {
                 const friendId = selectedFriends[0];
                 const friend = filteredFriends.find(f => f.id === friendId);
-                
+
                 if (friend?.hasExistingConversation) {
-                    const existingConversation = enrichedConversations.find(conv => 
-                        conv.conversation.participants.includes(friendId) && 
-                        conv.conversation.type === 'private'
+                    const existingConversation = conversations.find(conv =>
+                        conv.participants.some(p => p.id === friendId) &&
+                        conv.type === 'private'
                     );
-                    
+
                     if (existingConversation) {
                         router.push({
                             pathname: '/(chatbox)',
                             params: {
-                                conversationId: existingConversation.conversation.id,
+                                conversationId: existingConversation.id,
                                 name: `${friend.first_name} ${friend.last_name}`.trim() || friend.username,
                                 avatar: friend.avatar
                             }
@@ -242,20 +189,17 @@ const ConversationListScreen = () => {
                     }
                 }
             }
-    
+
             // Create new conversation
             const conversationData = {
                 type: selectedFriends.length === 1 ? 'private' : 'group',
                 creator_id: currentUserId,
                 participants: [currentUserId, ...selectedFriends]
             };
-    
+
             const response = await conversationAPI.createConversation(conversationData);
-            
-            // Assuming the response contains the new conversation ID
-            // You might need to adjust this based on your actual API response structure
             const newConversationId = response.data.id;
-            
+
             // Navigate to the new conversation
             if (selectedFriends.length === 1) {
                 const friend = filteredFriends.find(f => f.id === selectedFriends[0]);
@@ -277,18 +221,15 @@ const ConversationListScreen = () => {
                     }
                 });
             }
-    
+
             setSelectedFriends([]);
             setIsPopupVisible(false);
-            
-            // Refresh conversations list
             await refetch();
-            
+
         } catch (error) {
             console.error('Error creating conversation:', error);
-
         }
-    }, [selectedFriends, filteredFriends, enrichedConversations, currentUserId, refetch]);
+    }, [selectedFriends, filteredFriends, conversations, currentUserId, refetch]);
 
     const renderFriendItem = useCallback(({ item }: { item: FriendItem }) => {
         const fullName = `${item.first_name} ${item.last_name}`.trim() || item.username;
@@ -338,12 +279,14 @@ const ConversationListScreen = () => {
             ) : (
                 <FlatList
                     data={filteredConversations}
-                    keyExtractor={(item) => item.conversation.id.toString()}
+                    keyExtractor={(item) => item.id.toString()}
                     renderItem={({ item }) => {
-                        const lastMessageContent = item.lastMessage?.content || 'No messages yet';
-                        const lastMessageTime = item.lastMessage?.createAt
-                            ? moment(item.lastMessage.createAt).format('h:mm A')
+                        const lastMessageContent = item.latest_message_content || 'No messages yet';
+                        const lastMessageTime = item.latest_message_created_at
+                            ? moment(item.latest_message_created_at).format('h:mm A')
                             : '';
+                        const name = getConversationName(item);
+                        const avatar = getConversationAvatar(item);
 
                         return (
                             <TouchableOpacity
@@ -351,19 +294,19 @@ const ConversationListScreen = () => {
                                 onPress={() => router.push({
                                     pathname: '/(chatbox)',
                                     params: {
-                                        conversationId: item.conversation.id,
-                                        name: item.name,
-                                        avatar: item.avatar
+                                        conversationId: item.id,
+                                        name,
+                                        avatar
                                     }
                                 })}
                             >
                                 <Image
-                                    source={item.avatar ? { uri: item.avatar } : require('@/assets/images/default-avatar.png')}
+                                    source={avatar ? { uri: avatar } : require('@/assets/images/default-avatar.png')}
                                     style={styles.avatar}
                                 />
                                 <View style={styles.conversationContent}>
                                     <View style={styles.conversationHeader}>
-                                        <Text style={styles.conversationName}>{item.name}</Text>
+                                        <Text style={styles.conversationName}>{name}</Text>
                                         <Text style={styles.conversationTime}>{lastMessageTime}</Text>
                                     </View>
                                     <Text
@@ -395,12 +338,12 @@ const ConversationListScreen = () => {
             )}
 
             {/* Floating New Conversation Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.floatingButton}
                 onPress={() => {
                     setSelectedFriends([]);
                     setIsPopupVisible(true);
-                    refetchFriends(); // Force refresh friends list when opening
+                    refetchFriends();
                 }}
             >
                 <Text style={styles.buttonText}>+</Text>
@@ -419,7 +362,7 @@ const ConversationListScreen = () => {
                 <View style={styles.popupContainer}>
                     <View style={styles.popup}>
                         <Text style={styles.popupTitle}>Start New Conversation</Text>
-                        
+
                         {/* Friend search bar */}
                         <Searchbar
                             placeholder="Search friends"
@@ -428,10 +371,10 @@ const ConversationListScreen = () => {
                             style={styles.friendSearchBar}
                             inputStyle={styles.searchInput}
                         />
-                        
+
                         {/* Friends list */}
                         <FlatList
-                            data={filteredFriends.filter(friend => 
+                            data={filteredFriends.filter(friend =>
                                 `${friend.first_name} ${friend.last_name}`.toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
                                 friend.username.toLowerCase().includes(friendSearchQuery.toLowerCase())
                             )}
@@ -446,9 +389,9 @@ const ConversationListScreen = () => {
                                 </View>
                             }
                         />
-                        
+
                         {/* Confirm button */}
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[
                                 styles.confirmButton,
                                 selectedFriends.length === 0 && styles.disabledButton
@@ -457,12 +400,12 @@ const ConversationListScreen = () => {
                             disabled={selectedFriends.length === 0}
                         >
                             <Text style={styles.confirmButtonText}>
-                                {selectedFriends.length === 1 ? 
+                                {selectedFriends.length === 1 ?
                                     (filteredFriends.find(f => f.id === selectedFriends[0])?.hasExistingConversation ? 'Go to conversation' : 'Create conversation') : 'Create group chat'}
                             </Text>
                         </TouchableOpacity>
-                        
-                        <TouchableOpacity 
+
+                        <TouchableOpacity
                             style={styles.closeButton}
                             onPress={() => {
                                 setSelectedFriends([]);
@@ -477,7 +420,6 @@ const ConversationListScreen = () => {
         </View>
     );
 };
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
