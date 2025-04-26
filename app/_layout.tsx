@@ -15,6 +15,7 @@ import { ToastProvider } from "react-native-paper-toast";
 import { QueryClient, QueryClientProvider } from "react-query";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { LogBox } from 'react-native';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 // SplashScreen.preventAutoHideAsync();
@@ -25,6 +26,9 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
+
+  // For development, ignore all log notifications
+  LogBox.ignoreAllLogs();
 
   if (!loaded) {
     return null;

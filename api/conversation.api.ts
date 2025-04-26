@@ -5,7 +5,7 @@ import { User_Info_Response } from "../types/api/response/user_info.response";
 
 export const CONVERSATION_URL = {
     LIST_CONVERSATIONS: "/user/:userId/conversations",
-    CHAT_DETAIL: "/messages/:conversationId",
+    CHAT_DETAIL: "/conversations/:conversationId/messages",
     SEEN_MESSAGE: "/seenMessages/:conversationId",
     CREATE_CONVERSATION: "/ws/createConversation",
     JOIN_CONVERSATION: "/ws/joinConversation/:conversationId",
