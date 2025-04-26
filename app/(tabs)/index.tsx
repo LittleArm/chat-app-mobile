@@ -75,7 +75,7 @@ const ConversationListScreen = () => {
         },
         {
             enabled: !!currentUserId,
-            initialData: []
+            refetchInterval: 1000, // Refetch every 5 seconds (adjust as needed)
         }
     );
 
@@ -97,7 +97,7 @@ const ConversationListScreen = () => {
                 updatedFriends = updatedFriends.map(friend => {
                     const hasExistingConversation = conversations.some(conv =>
                         conv.participants.some(p => p.id === friend.id) &&
-                        conv.type === 'private'
+                        conv.participants.length === 2 // Only 1:1 chats
                     );
                     return { ...friend, hasExistingConversation };
                 });
@@ -107,8 +107,12 @@ const ConversationListScreen = () => {
         }
     }, [friends, conversations]);
 
+    const isGroupChat = (conversation: ConversationWithDetails) => {
+        return conversation.participants.length > 2;
+    };
+
     const getConversationName = (conversation: ConversationWithDetails) => {
-        if (conversation.type === 'group' && conversation.name) {
+        if (conversation.name) {
             return conversation.name;
         }
 
@@ -125,11 +129,20 @@ const ConversationListScreen = () => {
 
     const getConversationAvatar = (conversation: ConversationWithDetails) => {
         if (conversation.type === 'group') {
-            return ''; // Use default avatar for groups
+            return null;
         }
 
         const otherParticipant = conversation.participants.find(p => p.id !== currentUserId);
         return otherParticipant?.avatar || '';
+    };
+    const getAvatarColor = (id: number) => {
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+            '#98D8C8', '#F06292', '#7986CB', '#9575CD',
+            '#64B5F6', '#4DB6AC', '#81C784', '#FFD54F',
+            '#FF8A65', '#A1887F', '#90A4AE'
+        ];
+        return colors[id % colors.length];
     };
 
     const handleRefresh = useCallback(async () => {
@@ -162,19 +175,19 @@ const ConversationListScreen = () => {
 
     const handleConfirmSelection = useCallback(async () => {
         if (selectedFriends.length === 0 || !currentUserId) return;
-    
+
         try {
             // If only one friend is selected and has existing conversation, navigate to it
             if (selectedFriends.length === 1) {
                 const friendId = selectedFriends[0];
                 const friend = filteredFriends.find(f => f.id === friendId);
-    
+
                 if (friend?.hasExistingConversation) {
                     const existingConversation = conversations.find(conv =>
                         conv.participants.some(p => p.id === friendId) &&
-                        conv.type === 'private'
+                        conv.participants.length === 2
                     );
-    
+
                     if (existingConversation) {
                         router.push({
                             pathname: '/(chatbox)',
@@ -190,7 +203,7 @@ const ConversationListScreen = () => {
                     }
                 }
             }
-    
+
             // Generate conversation name if not provided
             let name = conversationName;
             if (!name) {
@@ -201,33 +214,34 @@ const ConversationListScreen = () => {
                     name = `Group with ${selectedFriends.length} members`;
                 }
             }
-    
+
             // Create new conversation
+            const isGroup = selectedFriends.length > 1;
             const conversationData = {
-                type: selectedFriends.length === 1 ? 'private' : 'group',
+                type: isGroup ? 'group' : 'private',
                 creator_id: currentUserId,
                 participants: [currentUserId, ...selectedFriends],
-                name: conversationName || null // Send null if no name is provided
+                name: isGroup ? (conversationName || name) : null
             };
-    
+
             const response = await conversationAPI.createConversation(conversationData);
             const newConversationId = response.data.id;
-    
+
             // Navigate to the new conversation
             router.push({
                 pathname: '/(chatbox)',
                 params: {
                     conversationId: newConversationId,
                     name: name,
-                    avatar: selectedFriends.length === 1 ? filteredFriends.find(f => f.id === selectedFriends[0])?.avatar : ''
+                    avatar: isGroup ? '' : filteredFriends.find(f => f.id === selectedFriends[0])?.avatar
                 }
             });
-    
+
             setSelectedFriends([]);
             setConversationName('');
             setIsPopupVisible(false);
             await refetch();
-    
+
         } catch (error) {
             console.error('Error creating conversation:', error);
         }
@@ -264,6 +278,64 @@ const ConversationListScreen = () => {
         );
     }, [selectedFriends]);
 
+    const renderConversationItem = useCallback(({ item }: { item: ConversationWithDetails }) => {
+        const lastMessageContent = item.latest_message_content || 'No messages yet';
+        const lastMessageTime = item.latest_message_created_at
+            ? moment(item.latest_message_created_at).format('h:mm A')
+            : '';
+        const name = getConversationName(item);
+        const isGroup = isGroupChat(item);
+
+        return (
+            <TouchableOpacity
+                style={styles.conversationItem}
+                onPress={() => router.push({
+                    pathname: '/(chatbox)',
+                    params: {
+                        conversationId: item.id,
+                        name,
+                        avatar: isGroup ? '' : getConversationAvatar(item)
+                    }
+                })}
+            >
+                <View style={styles.avatarContainer}>
+                    {isGroup ? (
+                        <View style={[
+                            styles.groupAvatar,
+                            { backgroundColor: getAvatarColor(item.id) }
+                        ]}>
+                            <Text style={styles.groupAvatarText}>
+                                {name.charAt(0).toUpperCase()}
+                            </Text>
+                        </View>
+                    ) : (
+                        <Image
+                            source={getConversationAvatar(item)
+                                ? { uri: getConversationAvatar(item) }
+                                : require('@/assets/images/default-avatar.png')
+                            }
+                            style={styles.avatar}
+                            defaultSource={require('@/assets/images/default-avatar.png')}
+                        />
+                    )}
+                </View>
+                <View style={styles.conversationContent}>
+                    <View style={styles.conversationHeader}>
+                        <Text style={styles.conversationName}>{name}</Text>
+                        <Text style={styles.conversationTime}>{lastMessageTime}</Text>
+                    </View>
+                    <Text
+                        style={styles.conversationMessage}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {lastMessageContent}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    }, []);
+
     return (
         <View style={styles.container}>
             {/* Search Bar */}
@@ -282,46 +354,7 @@ const ConversationListScreen = () => {
                 <FlatList
                     data={filteredConversations}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({ item }) => {
-                        const lastMessageContent = item.latest_message_content || 'No messages yet';
-                        const lastMessageTime = item.latest_message_created_at
-                            ? moment(item.latest_message_created_at).format('h:mm A')
-                            : '';
-                        const name = getConversationName(item);
-                        const avatar = getConversationAvatar(item);
-
-                        return (
-                            <TouchableOpacity
-                                style={styles.conversationItem}
-                                onPress={() => router.push({
-                                    pathname: '/(chatbox)',
-                                    params: {
-                                        conversationId: item.id,
-                                        name,
-                                        avatar
-                                    }
-                                })}
-                            >
-                                <Image
-                                    source={avatar ? { uri: avatar } : require('@/assets/images/default-avatar.png')}
-                                    style={styles.avatar}
-                                />
-                                <View style={styles.conversationContent}>
-                                    <View style={styles.conversationHeader}>
-                                        <Text style={styles.conversationName}>{name}</Text>
-                                        <Text style={styles.conversationTime}>{lastMessageTime}</Text>
-                                    </View>
-                                    <Text
-                                        style={styles.conversationMessage}
-                                        numberOfLines={1}
-                                        ellipsizeMode="tail"
-                                    >
-                                        {lastMessageContent}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    }}
+                    renderItem={renderConversationItem}
                     ItemSeparatorComponent={() => <View style={styles.separator} />}
                     refreshControl={
                         <RefreshControl
@@ -436,6 +469,7 @@ const ConversationListScreen = () => {
         </View>
     );
 };
+
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -457,11 +491,27 @@ const styles = StyleSheet.create({
         padding: 16,
         alignItems: 'center',
     },
-    avatar: {
+    avatarContainer: {
         width: 50,
         height: 50,
-        borderRadius: 25,
         marginRight: 16,
+    },
+    avatar: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 25,
+    },
+    groupAvatar: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    groupAvatarText: {
+        color: 'white',
+        fontSize: 20,
+        fontWeight: 'bold',
     },
     conversationContent: {
         flex: 1,
