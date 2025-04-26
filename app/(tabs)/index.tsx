@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Searchbar, Checkbox } from 'react-native-paper';
-import { FlatList, View, Text, TouchableOpacity, Image, RefreshControl, StyleSheet, Modal } from 'react-native';
+import { FlatList, View, Text, TouchableOpacity, Image, RefreshControl, StyleSheet, Modal, TextInput } from 'react-native';
 import { useQuery } from 'react-query';
 import { STORAGE_KEY } from '@/utils/constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -51,6 +51,7 @@ const ConversationListScreen = () => {
     const [isPopupVisible, setIsPopupVisible] = useState(false);
     const [friendSearchQuery, setFriendSearchQuery] = useState('');
     const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
+    const [conversationName, setConversationName] = useState('');
 
     // Load user ID
     useEffect(() => {
@@ -161,19 +162,19 @@ const ConversationListScreen = () => {
 
     const handleConfirmSelection = useCallback(async () => {
         if (selectedFriends.length === 0 || !currentUserId) return;
-
+    
         try {
             // If only one friend is selected and has existing conversation, navigate to it
             if (selectedFriends.length === 1) {
                 const friendId = selectedFriends[0];
                 const friend = filteredFriends.find(f => f.id === friendId);
-
+    
                 if (friend?.hasExistingConversation) {
                     const existingConversation = conversations.find(conv =>
                         conv.participants.some(p => p.id === friendId) &&
                         conv.type === 'private'
                     );
-
+    
                     if (existingConversation) {
                         router.push({
                             pathname: '/(chatbox)',
@@ -189,47 +190,48 @@ const ConversationListScreen = () => {
                     }
                 }
             }
-
+    
+            // Generate conversation name if not provided
+            let name = conversationName;
+            if (!name) {
+                if (selectedFriends.length === 1) {
+                    const friend = filteredFriends.find(f => f.id === selectedFriends[0]);
+                    name = `${friend?.first_name} ${friend?.last_name}`.trim() || friend?.username || 'New Chat';
+                } else {
+                    name = `Group with ${selectedFriends.length} members`;
+                }
+            }
+    
             // Create new conversation
             const conversationData = {
                 type: selectedFriends.length === 1 ? 'private' : 'group',
                 creator_id: currentUserId,
-                participants: [currentUserId, ...selectedFriends]
+                participants: [currentUserId, ...selectedFriends],
+                name: conversationName || null // Send null if no name is provided
             };
-
+    
             const response = await conversationAPI.createConversation(conversationData);
             const newConversationId = response.data.id;
-
+    
             // Navigate to the new conversation
-            if (selectedFriends.length === 1) {
-                const friend = filteredFriends.find(f => f.id === selectedFriends[0]);
-                router.push({
-                    pathname: '/(chatbox)',
-                    params: {
-                        conversationId: newConversationId,
-                        name: `${friend?.first_name} ${friend?.last_name}`.trim() || friend?.username || 'New Chat',
-                        avatar: friend?.avatar
-                    }
-                });
-            } else {
-                router.push({
-                    pathname: '/(chatbox)',
-                    params: {
-                        conversationId: newConversationId,
-                        name: `Group with ${selectedFriends.length} members`,
-                        avatar: ''
-                    }
-                });
-            }
-
+            router.push({
+                pathname: '/(chatbox)',
+                params: {
+                    conversationId: newConversationId,
+                    name: name,
+                    avatar: selectedFriends.length === 1 ? filteredFriends.find(f => f.id === selectedFriends[0])?.avatar : ''
+                }
+            });
+    
             setSelectedFriends([]);
+            setConversationName('');
             setIsPopupVisible(false);
             await refetch();
-
+    
         } catch (error) {
             console.error('Error creating conversation:', error);
         }
-    }, [selectedFriends, filteredFriends, conversations, currentUserId, refetch]);
+    }, [selectedFriends, filteredFriends, conversations, currentUserId, conversationName, refetch]);
 
     const renderFriendItem = useCallback(({ item }: { item: FriendItem }) => {
         const fullName = `${item.first_name} ${item.last_name}`.trim() || item.username;
@@ -356,12 +358,26 @@ const ConversationListScreen = () => {
                 animationType="fade"
                 onRequestClose={() => {
                     setSelectedFriends([]);
+                    setConversationName('');
                     setIsPopupVisible(false);
                 }}
             >
                 <View style={styles.popupContainer}>
                     <View style={styles.popup}>
                         <Text style={styles.popupTitle}>Start New Conversation</Text>
+
+                        {/* Name input for group chats */}
+                        {selectedFriends.length > 1 && (
+                            <View style={styles.nameInputContainer}>
+                                <Text style={styles.nameInputLabel}>Group Name (optional)</Text>
+                                <TextInput
+                                    style={styles.nameInput}
+                                    placeholder="Enter group name"
+                                    value={conversationName}
+                                    onChangeText={setConversationName}
+                                />
+                            </View>
+                        )}
 
                         {/* Friend search bar */}
                         <Searchbar
@@ -587,6 +603,21 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    nameInputContainer: {
+        marginBottom: 15,
+    },
+    nameInputLabel: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 5,
+    },
+    nameInput: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 16,
     },
 });
 
